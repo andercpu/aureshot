@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="popup.documentTitle">AureShot</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body class="extension-editorial-popup">
+    <main class="popup-shell">
+      <div class="popup-topbar">
+        <p class="popup-kicker">AureShot</p>
+        <label class="popup-language-control">
+          <span data-i18n="common.language">Idioma</span>
+          <select id="popupLanguageSelect" class="popup-language-select" aria-label="Idioma" data-i18n-aria-label="common.language"></select>
+        </label>
+      </div>
+      <h1 data-i18n="popup.heading">Escolha o tipo de captura</h1>
+      <p class="popup-copy" data-i18n="popup.copy">
+        Use uma área redimensionável na aba atual ou gere uma captura da página inteira.
+      </p>
+
+      <div class="popup-actions">
+        <button id="regionCaptureButton" class="action-card" type="button">
+          <span class="action-title" data-i18n="popup.region.title">Selecionar área</span>
+        </button>
+
+        <button id="fullPageCaptureButton" class="action-card action-card-secondary" type="button">
+          <span class="action-title" data-i18n="popup.fullPage.title">Página inteira</span>
+        </button>
+
+        <button id="resumeProjectButton" class="action-card action-card-secondary" type="button">
+          <span class="action-title" data-i18n="popup.resume.title">Retomar último projeto</span>
+        </button>
+      </div>
+
+      <div id="popupProgress" class="popup-progress is-hidden" aria-live="polite">
+        <div class="popup-progress-track">
+          <div id="popupProgressBar" class="popup-progress-bar"></div>
+        </div>
+        <div class="popup-progress-meta">
+          <span id="popupProgressValue">0%</span>
+          <button id="cancelCaptureButton" class="popup-cancel-button" type="button" data-i18n="popup.cancel">Cancelar</button>
+        </div>
+      </div>
+
+      <p id="popupStatus" class="popup-status" aria-live="polite"></p>
+    </main>
+
+    <script src="i18n.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

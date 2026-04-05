@@ -1,0 +1,911 @@
+(function (scope) {
+  const STORAGE_KEY = "preferredLanguage";
+  const FALLBACK_LANGUAGE = "en";
+  const AVAILABLE_LANGUAGES = [
+    { code: "pt-BR", label: "Português (Brasil)" },
+    { code: "pt-PT", label: "Português (Portugal)" },
+    { code: "en", label: "English" },
+    { code: "es", label: "Español" },
+    { code: "fr", label: "Français" },
+  ];
+
+  const MESSAGES = {
+    "pt-BR": {
+      "common.language": "Idioma",
+      "common.errorUnexpected": "Ocorreu um erro inesperado.",
+      "common.errorUnexpectedCapture": "Ocorreu um erro inesperado durante a captura.",
+      "common.pixels": "{value} px",
+
+      "popup.documentTitle": "AureShot",
+      "popup.heading": "Escolha o tipo de captura",
+      "popup.copy": "Use uma área redimensionável na aba atual ou gere uma captura da página inteira.",
+      "popup.region.title": "Selecionar área",
+      "popup.fullPage.title": "Página inteira",
+      "popup.resume.title": "Retomar último projeto",
+      "popup.cancel": "Cancelar",
+      "popup.busy.preparingSelector": "Preparando seletor na página atual...",
+      "popup.busy.capturingFullPage": "Capturando a página inteira...",
+      "popup.busy.openingLastProject": "Abrindo o último projeto salvo...",
+      "popup.error.noActiveTab": "Nenhuma aba ativa disponível para captura.",
+      "popup.error.operationFailed": "Não foi possível concluir a operação.",
+      "popup.status.completed": "Operação concluída.",
+
+      "editor.documentTitle": "AureShot Editor",
+      "editor.heading": "Editor de marcação",
+      "editor.helpButtonLabel": "Abrir ajuda",
+      "editor.saveDraft": "Salvar rascunho",
+      "editor.copy": "Copiar",
+      "editor.downloadPng": "Baixar PNG",
+      "editor.tool.move": "Mover",
+      "editor.tool.marker": "Marcador",
+      "editor.tool.arrow": "Seta",
+      "editor.tool.text": "Texto",
+      "editor.tool.pin": "Pin",
+      "editor.tool.circle": "Círculo",
+      "editor.tool.rectangle": "Retângulo",
+      "editor.tool.blur": "Blur",
+      "editor.tool.redact": "Tarja",
+      "editor.tool.crop": "Crop",
+      "editor.caption.tools": "Ferramentas",
+      "editor.caption.appearance": "Ajustes",
+      "editor.caption.edit": "Edição",
+      "editor.caption.view": "Visualização",
+      "editor.control.color": "Cor",
+      "editor.control.size": "Espessura / tamanho",
+      "editor.undo": "Desfazer",
+      "editor.redo": "Refazer",
+      "editor.delete": "Excluir",
+      "editor.applyCrop": "Aplicar crop",
+      "editor.fitWidth": "Ajustar largura",
+      "editor.empty.loadingTitle": "Carregando captura...",
+      "editor.empty.loadingCopy": "Assim que a imagem estiver pronta, o editor será exibido aqui.",
+      "editor.help.kicker": "Guia rápido",
+      "editor.help.title": "Como usar o editor",
+      "editor.help.copy": "Os controles principais ficam na barra superior e o restante acontece direto sobre o print.",
+      "editor.help.close": "Fechar",
+      "editor.help.flow.title": "Fluxo básico",
+      "editor.help.flow.step1": "1. Capture a tela ou a página inteira.",
+      "editor.help.flow.step2": "2. Escolha uma ferramenta na barra superior.",
+      "editor.help.flow.step3": "3. Clique e arraste para desenhar, ou clique para criar texto e pin.",
+      "editor.help.flow.step4": "4. Selecione um item para mover, redimensionar ou excluir.",
+      "editor.help.tools.title": "Ferramentas",
+      "editor.help.tools.marker": "<strong>Marcador</strong>: desenha livremente.",
+      "editor.help.tools.arrow": "<strong>Seta</strong>: destaca direção.",
+      "editor.help.tools.text": "<strong>Texto</strong>: adiciona comentário editável.",
+      "editor.help.tools.pin": "<strong>Pin</strong>: cria marcadores numerados.",
+      "editor.help.tools.shapes": "<strong>Círculo / Retângulo</strong>: destaca áreas.",
+      "editor.help.tools.privacy": "<strong>Blur / Tarja</strong>: oculta informações sensíveis.",
+      "editor.help.tools.crop": "<strong>Crop</strong>: recorta a captura depois de pronta.",
+      "editor.help.tools.move": "<strong>Mover</strong>: navega pela imagem com arraste.",
+      "editor.help.shortcuts.title": "Atalhos úteis",
+      "editor.help.shortcuts.zoom": "<strong>Shift + scroll</strong>: zoom no print.",
+      "editor.help.shortcuts.pan": "<strong>Space</strong>: pan temporário.",
+      "editor.help.shortcuts.undo": "<strong>Ctrl/Cmd + Z</strong>: desfazer.",
+      "editor.help.shortcuts.redo": "<strong>Ctrl/Cmd + Y</strong> ou <strong>Ctrl/Cmd + Shift + Z</strong>: refazer.",
+      "editor.help.shortcuts.delete": "<strong>Delete / Backspace</strong>: excluir item selecionado.",
+      "editor.help.shortcuts.copy": "<strong>Ctrl/Cmd + Shift + C</strong>: copiar imagem.",
+      "editor.help.shortcuts.save": "<strong>Ctrl/Cmd + S</strong>: salvar rascunho.",
+      "editor.help.shortcuts.snap": "<strong>Shift</strong> ao desenhar: snap para formas perfeitas e alinhamentos.",
+      "editor.help.shortcuts.help": "<strong>F1</strong> ou <strong>?</strong>: abrir ajuda.",
+      "editor.text.placeholder": "Digite o texto",
+      "editor.error.openCaptureTitle": "Não foi possível abrir a captura.",
+      "editor.error.noCaptureTitle": "Nenhuma captura foi recebida.",
+      "editor.error.noCaptureCopy": "Refaça a captura a partir da extensão.",
+      "editor.error.captureNotFound": "A captura não foi encontrada. Refaça o print e tente novamente.",
+      "editor.notice.draftRestored": "Rascunho restaurado.",
+      "editor.notice.cropApplied": "Crop aplicado.",
+      "editor.notice.draftSaved": "Rascunho salvo.",
+      "editor.notice.imageCopied": "Imagem copiada para a área de transferência.",
+      "editor.meta.fullPage": "Página inteira",
+      "editor.meta.region": "Região personalizada",
+      "editor.meta.format": "{mode} - {dimensions}",
+      "editor.error.clipboardUnavailable": "A cópia para a área de transferência não está disponível neste ambiente.",
+      "editor.error.finalImage": "Não foi possível gerar a imagem final.",
+      "editor.error.capturedImageLoad": "Não foi possível carregar a imagem capturada.",
+      "editor.download.filePrefix": "print-anotado",
+
+      "content.selection.hintTitle": "Desenhe a área que deseja capturar",
+      "content.selection.hintCopy": "Arraste para criar a seleção, ajuste pelos cantos e confirme. Enter captura e Esc cancela.",
+      "content.selection.toolbarLabel": "Área personalizada",
+      "content.selection.capture": "Capturar",
+      "content.selection.cancel": "Cancelar",
+      "content.selection.size": "{width} x {height} px",
+
+      "service.progress.preparingFullPage": "Preparando a página inteira...",
+      "service.progress.openingEditor": "Abrindo o editor...",
+      "service.progress.completed": "Captura concluída.",
+      "service.progress.canceling": "Cancelando captura...",
+      "service.progress.capturingSlices": "Capturando as fatias da página...",
+      "service.progress.assemblingSlice": "Montando fatia {index} de {total}...",
+      "service.error.noCaptureToCancel": "Não existe captura em andamento para cancelar.",
+      "service.error.noRecentProject": "Nenhum projeto recente foi encontrado.",
+      "service.error.viewportSize": "Não foi possível identificar o tamanho da viewport.",
+      "service.error.viewportContent": "Não foi possível identificar a área útil da viewport.",
+      "service.error.pageHeight": "Não foi possível identificar a altura da página.",
+      "service.error.buildFullPage": "Não foi possível montar a captura da página inteira.",
+      "service.error.prepareFullPageCanvas": "Não foi possível preparar o canvas da captura full page.",
+      "service.error.captureTab": "Não foi possível executar a captura na aba.",
+      "service.error.tabWindow": "Não foi possível identificar a janela da aba para capturar.",
+      "service.error.visibleCaptureEmpty": "A captura visível retornou vazia.",
+      "service.error.cropCanvas": "Não foi possível preparar o canvas de recorte.",
+      "service.error.readImage": "Não foi possível ler a imagem capturada.",
+      "service.error.captureInProgress": "Já existe uma captura em andamento nesta aba.",
+      "service.error.captureCancelled": "Captura cancelada.",
+      "service.error.activeTabNotFound": "A aba ativa não foi encontrada.",
+      "service.error.regionNotReceived": "A região selecionada não foi recebida.",
+      "service.error.invalidX": "A coordenada horizontal selecionada é inválida.",
+      "service.error.invalidY": "A coordenada vertical selecionada é inválida.",
+      "service.error.invalidWidth": "A largura selecionada é inválida.",
+      "service.error.invalidHeight": "A altura selecionada é inválida.",
+      "service.error.invalidViewportWidth": "A largura da viewport é inválida.",
+      "service.error.invalidViewportHeight": "A altura da viewport é inválida.",
+
+      "captureStore.error.save": "Não foi possível salvar a captura.",
+      "captureStore.error.saveComplete": "Não foi possível finalizar o salvamento da captura.",
+      "captureStore.error.saveAbort": "O salvamento da captura foi abortado.",
+      "captureStore.error.read": "Não foi possível ler a captura.",
+      "captureStore.error.readComplete": "Não foi possível concluir a leitura da captura.",
+      "captureStore.error.list": "Não foi possível listar as capturas.",
+      "captureStore.error.listComplete": "Não foi possível concluir a listagem das capturas.",
+      "captureStore.error.delete": "Não foi possível remover a captura.",
+      "captureStore.error.deleteComplete": "Não foi possível concluir a remoção da captura.",
+      "captureStore.error.openDatabase": "Não foi possível abrir o banco de capturas.",
+    },
+
+    "pt-PT": {
+      "common.language": "Idioma",
+      "common.errorUnexpected": "Ocorreu um erro inesperado.",
+      "common.errorUnexpectedCapture": "Ocorreu um erro inesperado durante a captura.",
+      "common.pixels": "{value} px",
+
+      "popup.documentTitle": "AureShot",
+      "popup.heading": "Escolha o tipo de captura",
+      "popup.copy": "Use uma área redimensionável no separador atual ou gere uma captura da página inteira.",
+      "popup.region.title": "Selecionar área",
+      "popup.fullPage.title": "Página inteira",
+      "popup.resume.title": "Retomar último projeto",
+      "popup.cancel": "Cancelar",
+      "popup.busy.preparingSelector": "A preparar o seletor na página atual...",
+      "popup.busy.capturingFullPage": "A capturar a página inteira...",
+      "popup.busy.openingLastProject": "A abrir o último projeto guardado...",
+      "popup.error.noActiveTab": "Não existe nenhum separador ativo disponível para captura.",
+      "popup.error.operationFailed": "Não foi possível concluir a operação.",
+      "popup.status.completed": "Operação concluída.",
+
+      "editor.documentTitle": "AureShot Editor",
+      "editor.heading": "Editor de marcação",
+      "editor.helpButtonLabel": "Abrir ajuda",
+      "editor.saveDraft": "Guardar rascunho",
+      "editor.copy": "Copiar",
+      "editor.downloadPng": "Descarregar PNG",
+      "editor.tool.move": "Mover",
+      "editor.tool.marker": "Marcador",
+      "editor.tool.arrow": "Seta",
+      "editor.tool.text": "Texto",
+      "editor.tool.pin": "Pin",
+      "editor.tool.circle": "Círculo",
+      "editor.tool.rectangle": "Retângulo",
+      "editor.tool.blur": "Blur",
+      "editor.tool.redact": "Tarja",
+      "editor.tool.crop": "Crop",
+      "editor.caption.tools": "Ferramentas",
+      "editor.caption.appearance": "Ajustes",
+      "editor.caption.edit": "Edição",
+      "editor.caption.view": "Visualização",
+      "editor.control.color": "Cor",
+      "editor.control.size": "Espessura / tamanho",
+      "editor.undo": "Desfazer",
+      "editor.redo": "Refazer",
+      "editor.delete": "Eliminar",
+      "editor.applyCrop": "Aplicar crop",
+      "editor.fitWidth": "Ajustar à largura",
+      "editor.empty.loadingTitle": "A carregar captura...",
+      "editor.empty.loadingCopy": "Assim que a imagem estiver pronta, o editor será apresentado aqui.",
+      "editor.help.kicker": "Guia rápido",
+      "editor.help.title": "Como usar o editor",
+      "editor.help.copy": "Os controlos principais ficam na barra superior e o restante acontece diretamente sobre a captura.",
+      "editor.help.close": "Fechar",
+      "editor.help.flow.title": "Fluxo básico",
+      "editor.help.flow.step1": "1. Capture o ecrã ou a página inteira.",
+      "editor.help.flow.step2": "2. Escolha uma ferramenta na barra superior.",
+      "editor.help.flow.step3": "3. Clique e arraste para desenhar, ou clique para criar texto e pin.",
+      "editor.help.flow.step4": "4. Selecione um item para mover, redimensionar ou eliminar.",
+      "editor.help.tools.title": "Ferramentas",
+      "editor.help.tools.marker": "<strong>Marcador</strong>: desenha livremente.",
+      "editor.help.tools.arrow": "<strong>Seta</strong>: destaca direção.",
+      "editor.help.tools.text": "<strong>Texto</strong>: adiciona comentário editável.",
+      "editor.help.tools.pin": "<strong>Pin</strong>: cria marcadores numerados.",
+      "editor.help.tools.shapes": "<strong>Círculo / Retângulo</strong>: destaca áreas.",
+      "editor.help.tools.privacy": "<strong>Blur / Tarja</strong>: oculta informações sensíveis.",
+      "editor.help.tools.crop": "<strong>Crop</strong>: recorta a captura depois de pronta.",
+      "editor.help.tools.move": "<strong>Mover</strong>: navega pela imagem com arraste.",
+      "editor.help.shortcuts.title": "Atalhos úteis",
+      "editor.help.shortcuts.zoom": "<strong>Shift + scroll</strong>: zoom na captura.",
+      "editor.help.shortcuts.pan": "<strong>Space</strong>: pan temporário.",
+      "editor.help.shortcuts.undo": "<strong>Ctrl/Cmd + Z</strong>: desfazer.",
+      "editor.help.shortcuts.redo": "<strong>Ctrl/Cmd + Y</strong> ou <strong>Ctrl/Cmd + Shift + Z</strong>: refazer.",
+      "editor.help.shortcuts.delete": "<strong>Delete / Backspace</strong>: eliminar item selecionado.",
+      "editor.help.shortcuts.copy": "<strong>Ctrl/Cmd + Shift + C</strong>: copiar imagem.",
+      "editor.help.shortcuts.save": "<strong>Ctrl/Cmd + S</strong>: guardar rascunho.",
+      "editor.help.shortcuts.snap": "<strong>Shift</strong> ao desenhar: snap para formas perfeitas e alinhamentos.",
+      "editor.help.shortcuts.help": "<strong>F1</strong> ou <strong>?</strong>: abrir ajuda.",
+      "editor.text.placeholder": "Escreva o texto",
+      "editor.error.openCaptureTitle": "Não foi possível abrir a captura.",
+      "editor.error.noCaptureTitle": "Nenhuma captura foi recebida.",
+      "editor.error.noCaptureCopy": "Refaça a captura a partir da extensão.",
+      "editor.error.captureNotFound": "A captura não foi encontrada. Refaça o print e tente novamente.",
+      "editor.notice.draftRestored": "Rascunho restaurado.",
+      "editor.notice.cropApplied": "Crop aplicado.",
+      "editor.notice.draftSaved": "Rascunho guardado.",
+      "editor.notice.imageCopied": "Imagem copiada para a área de transferência.",
+      "editor.meta.fullPage": "Página inteira",
+      "editor.meta.region": "Região personalizada",
+      "editor.meta.format": "{mode} - {dimensions}",
+      "editor.error.clipboardUnavailable": "A cópia para a área de transferência não está disponível neste ambiente.",
+      "editor.error.finalImage": "Não foi possível gerar a imagem final.",
+      "editor.error.capturedImageLoad": "Não foi possível carregar a imagem capturada.",
+      "editor.download.filePrefix": "captura-anotada",
+
+      "content.selection.hintTitle": "Desenhe a área que deseja capturar",
+      "content.selection.hintCopy": "Arraste para criar a seleção, ajuste pelos cantos e confirme. Enter captura e Esc cancela.",
+      "content.selection.toolbarLabel": "Área personalizada",
+      "content.selection.capture": "Capturar",
+      "content.selection.cancel": "Cancelar",
+      "content.selection.size": "{width} x {height} px",
+
+      "service.progress.preparingFullPage": "A preparar a página inteira...",
+      "service.progress.openingEditor": "A abrir o editor...",
+      "service.progress.completed": "Captura concluída.",
+      "service.progress.canceling": "A cancelar captura...",
+      "service.progress.capturingSlices": "A capturar as fatias da página...",
+      "service.progress.assemblingSlice": "A montar a fatia {index} de {total}...",
+      "service.error.noCaptureToCancel": "Não existe nenhuma captura em curso para cancelar.",
+      "service.error.noRecentProject": "Não foi encontrado nenhum projeto recente.",
+      "service.error.viewportSize": "Não foi possível identificar o tamanho da viewport.",
+      "service.error.viewportContent": "Não foi possível identificar a área útil da viewport.",
+      "service.error.pageHeight": "Não foi possível identificar a altura da página.",
+      "service.error.buildFullPage": "Não foi possível montar a captura da página inteira.",
+      "service.error.prepareFullPageCanvas": "Não foi possível preparar o canvas da captura full page.",
+      "service.error.captureTab": "Não foi possível executar a captura no separador.",
+      "service.error.tabWindow": "Não foi possível identificar a janela do separador para capturar.",
+      "service.error.visibleCaptureEmpty": "A captura visível regressou vazia.",
+      "service.error.cropCanvas": "Não foi possível preparar o canvas de recorte.",
+      "service.error.readImage": "Não foi possível ler a imagem capturada.",
+      "service.error.captureInProgress": "Já existe uma captura em curso neste separador.",
+      "service.error.captureCancelled": "Captura cancelada.",
+      "service.error.activeTabNotFound": "O separador ativo não foi encontrado.",
+      "service.error.regionNotReceived": "A região selecionada não foi recebida.",
+      "service.error.invalidX": "A coordenada horizontal selecionada é inválida.",
+      "service.error.invalidY": "A coordenada vertical selecionada é inválida.",
+      "service.error.invalidWidth": "A largura selecionada é inválida.",
+      "service.error.invalidHeight": "A altura selecionada é inválida.",
+      "service.error.invalidViewportWidth": "A largura da viewport é inválida.",
+      "service.error.invalidViewportHeight": "A altura da viewport é inválida.",
+
+      "captureStore.error.save": "Não foi possível guardar a captura.",
+      "captureStore.error.saveComplete": "Não foi possível concluir a gravação da captura.",
+      "captureStore.error.saveAbort": "A gravação da captura foi cancelada.",
+      "captureStore.error.read": "Não foi possível ler a captura.",
+      "captureStore.error.readComplete": "Não foi possível concluir a leitura da captura.",
+      "captureStore.error.list": "Não foi possível listar as capturas.",
+      "captureStore.error.listComplete": "Não foi possível concluir a listagem das capturas.",
+      "captureStore.error.delete": "Não foi possível remover a captura.",
+      "captureStore.error.deleteComplete": "Não foi possível concluir a remoção da captura.",
+      "captureStore.error.openDatabase": "Não foi possível abrir a base de dados das capturas.",
+    },
+
+    en: {
+      "common.language": "Language",
+      "common.errorUnexpected": "An unexpected error occurred.",
+      "common.errorUnexpectedCapture": "An unexpected error occurred during capture.",
+      "common.pixels": "{value} px",
+
+      "popup.documentTitle": "AureShot",
+      "popup.heading": "Choose the capture type",
+      "popup.copy": "Use a resizable area on the current tab or create a full-page capture.",
+      "popup.region.title": "Select area",
+      "popup.fullPage.title": "Full page",
+      "popup.resume.title": "Resume latest project",
+      "popup.cancel": "Cancel",
+      "popup.busy.preparingSelector": "Preparing the selector on the current page...",
+      "popup.busy.capturingFullPage": "Capturing the full page...",
+      "popup.busy.openingLastProject": "Opening the latest saved project...",
+      "popup.error.noActiveTab": "No active tab is available for capture.",
+      "popup.error.operationFailed": "The operation could not be completed.",
+      "popup.status.completed": "Operation completed.",
+
+      "editor.documentTitle": "AureShot Editor",
+      "editor.heading": "Annotation editor",
+      "editor.helpButtonLabel": "Open help",
+      "editor.saveDraft": "Save draft",
+      "editor.copy": "Copy",
+      "editor.downloadPng": "Download PNG",
+      "editor.tool.move": "Move",
+      "editor.tool.marker": "Highlighter",
+      "editor.tool.arrow": "Arrow",
+      "editor.tool.text": "Text",
+      "editor.tool.pin": "Pin",
+      "editor.tool.circle": "Circle",
+      "editor.tool.rectangle": "Rectangle",
+      "editor.tool.blur": "Blur",
+      "editor.tool.redact": "Redact",
+      "editor.tool.crop": "Crop",
+      "editor.caption.tools": "Tools",
+      "editor.caption.appearance": "Appearance",
+      "editor.caption.edit": "Edit",
+      "editor.caption.view": "View",
+      "editor.control.color": "Color",
+      "editor.control.size": "Thickness / size",
+      "editor.undo": "Undo",
+      "editor.redo": "Redo",
+      "editor.delete": "Delete",
+      "editor.applyCrop": "Apply crop",
+      "editor.fitWidth": "Fit to width",
+      "editor.empty.loadingTitle": "Loading capture...",
+      "editor.empty.loadingCopy": "As soon as the image is ready, the editor will be shown here.",
+      "editor.help.kicker": "Quick guide",
+      "editor.help.title": "How to use the editor",
+      "editor.help.copy": "The main controls stay in the top bar and everything else happens directly on the screenshot.",
+      "editor.help.close": "Close",
+      "editor.help.flow.title": "Basic flow",
+      "editor.help.flow.step1": "1. Capture the screen or the full page.",
+      "editor.help.flow.step2": "2. Choose a tool from the top bar.",
+      "editor.help.flow.step3": "3. Click and drag to draw, or click to create text and pins.",
+      "editor.help.flow.step4": "4. Select an item to move, resize or delete it.",
+      "editor.help.tools.title": "Tools",
+      "editor.help.tools.marker": "<strong>Highlighter</strong>: draws freely.",
+      "editor.help.tools.arrow": "<strong>Arrow</strong>: highlights direction.",
+      "editor.help.tools.text": "<strong>Text</strong>: adds an editable comment.",
+      "editor.help.tools.pin": "<strong>Pin</strong>: creates numbered markers.",
+      "editor.help.tools.shapes": "<strong>Circle / Rectangle</strong>: highlights areas.",
+      "editor.help.tools.privacy": "<strong>Blur / Redact</strong>: hides sensitive information.",
+      "editor.help.tools.crop": "<strong>Crop</strong>: trims the capture after it is ready.",
+      "editor.help.tools.move": "<strong>Move</strong>: navigates the image by dragging.",
+      "editor.help.shortcuts.title": "Useful shortcuts",
+      "editor.help.shortcuts.zoom": "<strong>Shift + scroll</strong>: zoom on the screenshot.",
+      "editor.help.shortcuts.pan": "<strong>Space</strong>: temporary pan.",
+      "editor.help.shortcuts.undo": "<strong>Ctrl/Cmd + Z</strong>: undo.",
+      "editor.help.shortcuts.redo": "<strong>Ctrl/Cmd + Y</strong> or <strong>Ctrl/Cmd + Shift + Z</strong>: redo.",
+      "editor.help.shortcuts.delete": "<strong>Delete / Backspace</strong>: delete the selected item.",
+      "editor.help.shortcuts.copy": "<strong>Ctrl/Cmd + Shift + C</strong>: copy image.",
+      "editor.help.shortcuts.save": "<strong>Ctrl/Cmd + S</strong>: save draft.",
+      "editor.help.shortcuts.snap": "<strong>Shift</strong> while drawing: snap to perfect shapes and alignments.",
+      "editor.help.shortcuts.help": "<strong>F1</strong> or <strong>?</strong>: open help.",
+      "editor.text.placeholder": "Type your text",
+      "editor.error.openCaptureTitle": "The capture could not be opened.",
+      "editor.error.noCaptureTitle": "No capture was received.",
+      "editor.error.noCaptureCopy": "Redo the capture from the extension.",
+      "editor.error.captureNotFound": "The capture was not found. Take the screenshot again and try once more.",
+      "editor.notice.draftRestored": "Draft restored.",
+      "editor.notice.cropApplied": "Crop applied.",
+      "editor.notice.draftSaved": "Draft saved.",
+      "editor.notice.imageCopied": "Image copied to the clipboard.",
+      "editor.meta.fullPage": "Full page",
+      "editor.meta.region": "Custom area",
+      "editor.meta.format": "{mode} - {dimensions}",
+      "editor.error.clipboardUnavailable": "Clipboard copy is not available in this environment.",
+      "editor.error.finalImage": "The final image could not be generated.",
+      "editor.error.capturedImageLoad": "The captured image could not be loaded.",
+      "editor.download.filePrefix": "annotated-screenshot",
+
+      "content.selection.hintTitle": "Draw the area you want to capture",
+      "content.selection.hintCopy": "Drag to create the selection, adjust the corners and confirm. Enter captures and Esc cancels.",
+      "content.selection.toolbarLabel": "Custom area",
+      "content.selection.capture": "Capture",
+      "content.selection.cancel": "Cancel",
+      "content.selection.size": "{width} x {height} px",
+
+      "service.progress.preparingFullPage": "Preparing the full page...",
+      "service.progress.openingEditor": "Opening the editor...",
+      "service.progress.completed": "Capture completed.",
+      "service.progress.canceling": "Canceling capture...",
+      "service.progress.capturingSlices": "Capturing page slices...",
+      "service.progress.assemblingSlice": "Assembling slice {index} of {total}...",
+      "service.error.noCaptureToCancel": "There is no running capture to cancel.",
+      "service.error.noRecentProject": "No recent project was found.",
+      "service.error.viewportSize": "The viewport size could not be identified.",
+      "service.error.viewportContent": "The usable viewport area could not be identified.",
+      "service.error.pageHeight": "The page height could not be identified.",
+      "service.error.buildFullPage": "The full-page capture could not be built.",
+      "service.error.prepareFullPageCanvas": "The canvas for the full-page capture could not be prepared.",
+      "service.error.captureTab": "The tab capture could not be executed.",
+      "service.error.tabWindow": "The tab window for capture could not be identified.",
+      "service.error.visibleCaptureEmpty": "The visible capture returned empty.",
+      "service.error.cropCanvas": "The crop canvas could not be prepared.",
+      "service.error.readImage": "The captured image could not be read.",
+      "service.error.captureInProgress": "There is already a capture in progress on this tab.",
+      "service.error.captureCancelled": "Capture canceled.",
+      "service.error.activeTabNotFound": "The active tab was not found.",
+      "service.error.regionNotReceived": "The selected region was not received.",
+      "service.error.invalidX": "The selected horizontal coordinate is invalid.",
+      "service.error.invalidY": "The selected vertical coordinate is invalid.",
+      "service.error.invalidWidth": "The selected width is invalid.",
+      "service.error.invalidHeight": "The selected height is invalid.",
+      "service.error.invalidViewportWidth": "The viewport width is invalid.",
+      "service.error.invalidViewportHeight": "The viewport height is invalid.",
+
+      "captureStore.error.save": "The capture could not be saved.",
+      "captureStore.error.saveComplete": "The capture save operation could not be completed.",
+      "captureStore.error.saveAbort": "The capture save operation was aborted.",
+      "captureStore.error.read": "The capture could not be read.",
+      "captureStore.error.readComplete": "The capture read operation could not be completed.",
+      "captureStore.error.list": "The captures could not be listed.",
+      "captureStore.error.listComplete": "The capture listing could not be completed.",
+      "captureStore.error.delete": "The capture could not be removed.",
+      "captureStore.error.deleteComplete": "The capture removal could not be completed.",
+      "captureStore.error.openDatabase": "The capture database could not be opened.",
+    },
+
+    es: {
+      "common.language": "Idioma",
+      "common.errorUnexpected": "Se produjo un error inesperado.",
+      "common.errorUnexpectedCapture": "Se produjo un error inesperado durante la captura.",
+      "common.pixels": "{value} px",
+
+      "popup.documentTitle": "AureShot",
+      "popup.heading": "Elige el tipo de captura",
+      "popup.copy": "Usa un área redimensionable en la pestaña actual o genera una captura de página completa.",
+      "popup.region.title": "Seleccionar área",
+      "popup.fullPage.title": "Página completa",
+      "popup.resume.title": "Reanudar último proyecto",
+      "popup.cancel": "Cancelar",
+      "popup.busy.preparingSelector": "Preparando el selector en la página actual...",
+      "popup.busy.capturingFullPage": "Capturando la página completa...",
+      "popup.busy.openingLastProject": "Abriendo el último proyecto guardado...",
+      "popup.error.noActiveTab": "No hay ninguna pestaña activa disponible para capturar.",
+      "popup.error.operationFailed": "No se pudo completar la operación.",
+      "popup.status.completed": "Operación completada.",
+
+      "editor.documentTitle": "AureShot Editor",
+      "editor.heading": "Editor de anotaciones",
+      "editor.helpButtonLabel": "Abrir ayuda",
+      "editor.saveDraft": "Guardar borrador",
+      "editor.copy": "Copiar",
+      "editor.downloadPng": "Descargar PNG",
+      "editor.tool.move": "Mover",
+      "editor.tool.marker": "Marcador",
+      "editor.tool.arrow": "Flecha",
+      "editor.tool.text": "Texto",
+      "editor.tool.pin": "Pin",
+      "editor.tool.circle": "Círculo",
+      "editor.tool.rectangle": "Rectángulo",
+      "editor.tool.blur": "Blur",
+      "editor.tool.redact": "Ocultar",
+      "editor.tool.crop": "Recorte",
+      "editor.caption.tools": "Herramientas",
+      "editor.caption.appearance": "Ajustes",
+      "editor.caption.edit": "Edición",
+      "editor.caption.view": "Visualización",
+      "editor.control.color": "Color",
+      "editor.control.size": "Grosor / tamaño",
+      "editor.undo": "Deshacer",
+      "editor.redo": "Rehacer",
+      "editor.delete": "Eliminar",
+      "editor.applyCrop": "Aplicar recorte",
+      "editor.fitWidth": "Ajustar al ancho",
+      "editor.empty.loadingTitle": "Cargando captura...",
+      "editor.empty.loadingCopy": "En cuanto la imagen esté lista, el editor se mostrará aquí.",
+      "editor.help.kicker": "Guía rápida",
+      "editor.help.title": "Cómo usar el editor",
+      "editor.help.copy": "Los controles principales están en la barra superior y todo lo demás sucede directamente sobre la captura.",
+      "editor.help.close": "Cerrar",
+      "editor.help.flow.title": "Flujo básico",
+      "editor.help.flow.step1": "1. Captura la pantalla o la página completa.",
+      "editor.help.flow.step2": "2. Elige una herramienta en la barra superior.",
+      "editor.help.flow.step3": "3. Haz clic y arrastra para dibujar, o haz clic para crear texto y pins.",
+      "editor.help.flow.step4": "4. Selecciona un elemento para moverlo, redimensionarlo o eliminarlo.",
+      "editor.help.tools.title": "Herramientas",
+      "editor.help.tools.marker": "<strong>Marcador</strong>: dibuja libremente.",
+      "editor.help.tools.arrow": "<strong>Flecha</strong>: destaca una dirección.",
+      "editor.help.tools.text": "<strong>Texto</strong>: añade un comentario editable.",
+      "editor.help.tools.pin": "<strong>Pin</strong>: crea marcadores numerados.",
+      "editor.help.tools.shapes": "<strong>Círculo / Rectángulo</strong>: destaca áreas.",
+      "editor.help.tools.privacy": "<strong>Blur / Ocultar</strong>: oculta información sensible.",
+      "editor.help.tools.crop": "<strong>Recorte</strong>: recorta la captura una vez lista.",
+      "editor.help.tools.move": "<strong>Mover</strong>: navega por la imagen arrastrando.",
+      "editor.help.shortcuts.title": "Atajos útiles",
+      "editor.help.shortcuts.zoom": "<strong>Shift + scroll</strong>: zoom sobre la captura.",
+      "editor.help.shortcuts.pan": "<strong>Space</strong>: desplazamiento temporal.",
+      "editor.help.shortcuts.undo": "<strong>Ctrl/Cmd + Z</strong>: deshacer.",
+      "editor.help.shortcuts.redo": "<strong>Ctrl/Cmd + Y</strong> o <strong>Ctrl/Cmd + Shift + Z</strong>: rehacer.",
+      "editor.help.shortcuts.delete": "<strong>Delete / Backspace</strong>: eliminar el elemento seleccionado.",
+      "editor.help.shortcuts.copy": "<strong>Ctrl/Cmd + Shift + C</strong>: copiar imagen.",
+      "editor.help.shortcuts.save": "<strong>Ctrl/Cmd + S</strong>: guardar borrador.",
+      "editor.help.shortcuts.snap": "<strong>Shift</strong> al dibujar: ajuste para formas perfectas y alineaciones.",
+      "editor.help.shortcuts.help": "<strong>F1</strong> o <strong>?</strong>: abrir ayuda.",
+      "editor.text.placeholder": "Escribe el texto",
+      "editor.error.openCaptureTitle": "No se pudo abrir la captura.",
+      "editor.error.noCaptureTitle": "No se recibió ninguna captura.",
+      "editor.error.noCaptureCopy": "Vuelve a realizar la captura desde la extensión.",
+      "editor.error.captureNotFound": "No se encontró la captura. Haz la captura otra vez e inténtalo de nuevo.",
+      "editor.notice.draftRestored": "Borrador restaurado.",
+      "editor.notice.cropApplied": "Recorte aplicado.",
+      "editor.notice.draftSaved": "Borrador guardado.",
+      "editor.notice.imageCopied": "Imagen copiada al portapapeles.",
+      "editor.meta.fullPage": "Página completa",
+      "editor.meta.region": "Área personalizada",
+      "editor.meta.format": "{mode} - {dimensions}",
+      "editor.error.clipboardUnavailable": "La copia al portapapeles no está disponible en este entorno.",
+      "editor.error.finalImage": "No se pudo generar la imagen final.",
+      "editor.error.capturedImageLoad": "No se pudo cargar la imagen capturada.",
+      "editor.download.filePrefix": "captura-anotada",
+
+      "content.selection.hintTitle": "Dibuja el área que quieres capturar",
+      "content.selection.hintCopy": "Arrastra para crear la selección, ajusta las esquinas y confirma. Enter captura y Esc cancela.",
+      "content.selection.toolbarLabel": "Área personalizada",
+      "content.selection.capture": "Capturar",
+      "content.selection.cancel": "Cancelar",
+      "content.selection.size": "{width} x {height} px",
+
+      "service.progress.preparingFullPage": "Preparando la página completa...",
+      "service.progress.openingEditor": "Abriendo el editor...",
+      "service.progress.completed": "Captura completada.",
+      "service.progress.canceling": "Cancelando captura...",
+      "service.progress.capturingSlices": "Capturando los fragmentos de la página...",
+      "service.progress.assemblingSlice": "Montando fragmento {index} de {total}...",
+      "service.error.noCaptureToCancel": "No hay ninguna captura en curso para cancelar.",
+      "service.error.noRecentProject": "No se encontró ningún proyecto reciente.",
+      "service.error.viewportSize": "No se pudo identificar el tamaño del viewport.",
+      "service.error.viewportContent": "No se pudo identificar el área útil del viewport.",
+      "service.error.pageHeight": "No se pudo identificar la altura de la página.",
+      "service.error.buildFullPage": "No se pudo montar la captura de página completa.",
+      "service.error.prepareFullPageCanvas": "No se pudo preparar el canvas de la captura full page.",
+      "service.error.captureTab": "No se pudo ejecutar la captura en la pestaña.",
+      "service.error.tabWindow": "No se pudo identificar la ventana de la pestaña para capturar.",
+      "service.error.visibleCaptureEmpty": "La captura visible volvió vacía.",
+      "service.error.cropCanvas": "No se pudo preparar el canvas de recorte.",
+      "service.error.readImage": "No se pudo leer la imagen capturada.",
+      "service.error.captureInProgress": "Ya hay una captura en curso en esta pestaña.",
+      "service.error.captureCancelled": "Captura cancelada.",
+      "service.error.activeTabNotFound": "No se encontró la pestaña activa.",
+      "service.error.regionNotReceived": "No se recibió la región seleccionada.",
+      "service.error.invalidX": "La coordenada horizontal seleccionada no es válida.",
+      "service.error.invalidY": "La coordenada vertical seleccionada no es válida.",
+      "service.error.invalidWidth": "La anchura seleccionada no es válida.",
+      "service.error.invalidHeight": "La altura seleccionada no es válida.",
+      "service.error.invalidViewportWidth": "La anchura del viewport no es válida.",
+      "service.error.invalidViewportHeight": "La altura del viewport no es válida.",
+
+      "captureStore.error.save": "No se pudo guardar la captura.",
+      "captureStore.error.saveComplete": "No se pudo completar el guardado de la captura.",
+      "captureStore.error.saveAbort": "Se canceló el guardado de la captura.",
+      "captureStore.error.read": "No se pudo leer la captura.",
+      "captureStore.error.readComplete": "No se pudo completar la lectura de la captura.",
+      "captureStore.error.list": "No se pudieron listar las capturas.",
+      "captureStore.error.listComplete": "No se pudo completar el listado de capturas.",
+      "captureStore.error.delete": "No se pudo eliminar la captura.",
+      "captureStore.error.deleteComplete": "No se pudo completar la eliminación de la captura.",
+      "captureStore.error.openDatabase": "No se pudo abrir la base de datos de capturas.",
+    },
+
+    fr: {
+      "common.language": "Langue",
+      "common.errorUnexpected": "Une erreur inattendue s'est produite.",
+      "common.errorUnexpectedCapture": "Une erreur inattendue s'est produite pendant la capture.",
+      "common.pixels": "{value} px",
+
+      "popup.documentTitle": "AureShot",
+      "popup.heading": "Choisissez le type de capture",
+      "popup.copy": "Utilisez une zone redimensionnable dans l'onglet actuel ou créez une capture pleine page.",
+      "popup.region.title": "Sélectionner une zone",
+      "popup.fullPage.title": "Page entière",
+      "popup.resume.title": "Reprendre le dernier projet",
+      "popup.cancel": "Annuler",
+      "popup.busy.preparingSelector": "Préparation du sélecteur sur la page actuelle...",
+      "popup.busy.capturingFullPage": "Capture de la page entière...",
+      "popup.busy.openingLastProject": "Ouverture du dernier projet enregistré...",
+      "popup.error.noActiveTab": "Aucun onglet actif n'est disponible pour la capture.",
+      "popup.error.operationFailed": "L'opération n'a pas pu être terminée.",
+      "popup.status.completed": "Opération terminée.",
+
+      "editor.documentTitle": "AureShot Editor",
+      "editor.heading": "Éditeur d'annotations",
+      "editor.helpButtonLabel": "Ouvrir l'aide",
+      "editor.saveDraft": "Enregistrer le brouillon",
+      "editor.copy": "Copier",
+      "editor.downloadPng": "Télécharger PNG",
+      "editor.tool.move": "Déplacer",
+      "editor.tool.marker": "Marqueur",
+      "editor.tool.arrow": "Flèche",
+      "editor.tool.text": "Texte",
+      "editor.tool.pin": "Pin",
+      "editor.tool.circle": "Cercle",
+      "editor.tool.rectangle": "Rectangle",
+      "editor.tool.blur": "Flou",
+      "editor.tool.redact": "Masquer",
+      "editor.tool.crop": "Recadrer",
+      "editor.caption.tools": "Outils",
+      "editor.caption.appearance": "Réglages",
+      "editor.caption.edit": "Édition",
+      "editor.caption.view": "Affichage",
+      "editor.control.color": "Couleur",
+      "editor.control.size": "Épaisseur / taille",
+      "editor.undo": "Annuler",
+      "editor.redo": "Rétablir",
+      "editor.delete": "Supprimer",
+      "editor.applyCrop": "Appliquer le recadrage",
+      "editor.fitWidth": "Ajuster à la largeur",
+      "editor.empty.loadingTitle": "Chargement de la capture...",
+      "editor.empty.loadingCopy": "Dès que l'image sera prête, l'éditeur s'affichera ici.",
+      "editor.help.kicker": "Guide rapide",
+      "editor.help.title": "Comment utiliser l'éditeur",
+      "editor.help.copy": "Les commandes principales se trouvent dans la barre supérieure et tout le reste se fait directement sur la capture.",
+      "editor.help.close": "Fermer",
+      "editor.help.flow.title": "Flux de base",
+      "editor.help.flow.step1": "1. Capturez l'écran ou la page entière.",
+      "editor.help.flow.step2": "2. Choisissez un outil dans la barre supérieure.",
+      "editor.help.flow.step3": "3. Cliquez et faites glisser pour dessiner, ou cliquez pour créer du texte et des pins.",
+      "editor.help.flow.step4": "4. Sélectionnez un élément pour le déplacer, le redimensionner ou le supprimer.",
+      "editor.help.tools.title": "Outils",
+      "editor.help.tools.marker": "<strong>Marqueur</strong> : dessine librement.",
+      "editor.help.tools.arrow": "<strong>Flèche</strong> : met en évidence une direction.",
+      "editor.help.tools.text": "<strong>Texte</strong> : ajoute un commentaire modifiable.",
+      "editor.help.tools.pin": "<strong>Pin</strong> : crée des repères numérotés.",
+      "editor.help.tools.shapes": "<strong>Cercle / Rectangle</strong> : met en évidence des zones.",
+      "editor.help.tools.privacy": "<strong>Flou / Masquer</strong> : masque des informations sensibles.",
+      "editor.help.tools.crop": "<strong>Recadrer</strong> : recadre la capture une fois prête.",
+      "editor.help.tools.move": "<strong>Déplacer</strong> : navigue dans l'image en faisant glisser.",
+      "editor.help.shortcuts.title": "Raccourcis utiles",
+      "editor.help.shortcuts.zoom": "<strong>Shift + scroll</strong> : zoom sur la capture.",
+      "editor.help.shortcuts.pan": "<strong>Space</strong> : déplacement temporaire.",
+      "editor.help.shortcuts.undo": "<strong>Ctrl/Cmd + Z</strong> : annuler.",
+      "editor.help.shortcuts.redo": "<strong>Ctrl/Cmd + Y</strong> ou <strong>Ctrl/Cmd + Shift + Z</strong> : rétablir.",
+      "editor.help.shortcuts.delete": "<strong>Delete / Backspace</strong> : supprimer l'élément sélectionné.",
+      "editor.help.shortcuts.copy": "<strong>Ctrl/Cmd + Shift + C</strong> : copier l'image.",
+      "editor.help.shortcuts.save": "<strong>Ctrl/Cmd + S</strong> : enregistrer le brouillon.",
+      "editor.help.shortcuts.snap": "<strong>Shift</strong> pendant le dessin : alignement sur des formes parfaites et des repères.",
+      "editor.help.shortcuts.help": "<strong>F1</strong> ou <strong>?</strong> : ouvrir l'aide.",
+      "editor.text.placeholder": "Saisissez le texte",
+      "editor.error.openCaptureTitle": "La capture n'a pas pu être ouverte.",
+      "editor.error.noCaptureTitle": "Aucune capture n'a été reçue.",
+      "editor.error.noCaptureCopy": "Relancez la capture depuis l'extension.",
+      "editor.error.captureNotFound": "La capture est introuvable. Refaites la capture et réessayez.",
+      "editor.notice.draftRestored": "Brouillon restauré.",
+      "editor.notice.cropApplied": "Recadrage appliqué.",
+      "editor.notice.draftSaved": "Brouillon enregistré.",
+      "editor.notice.imageCopied": "Image copiée dans le presse-papiers.",
+      "editor.meta.fullPage": "Page entière",
+      "editor.meta.region": "Zone personnalisée",
+      "editor.meta.format": "{mode} - {dimensions}",
+      "editor.error.clipboardUnavailable": "La copie dans le presse-papiers n'est pas disponible dans cet environnement.",
+      "editor.error.finalImage": "L'image finale n'a pas pu être générée.",
+      "editor.error.capturedImageLoad": "L'image capturée n'a pas pu être chargée.",
+      "editor.download.filePrefix": "capture-annotee",
+
+      "content.selection.hintTitle": "Dessinez la zone que vous voulez capturer",
+      "content.selection.hintCopy": "Faites glisser pour créer la sélection, ajustez les coins et confirmez. Enter capture et Esc annule.",
+      "content.selection.toolbarLabel": "Zone personnalisée",
+      "content.selection.capture": "Capturer",
+      "content.selection.cancel": "Annuler",
+      "content.selection.size": "{width} x {height} px",
+
+      "service.progress.preparingFullPage": "Préparation de la page entière...",
+      "service.progress.openingEditor": "Ouverture de l'éditeur...",
+      "service.progress.completed": "Capture terminée.",
+      "service.progress.canceling": "Annulation de la capture...",
+      "service.progress.capturingSlices": "Capture des sections de la page...",
+      "service.progress.assemblingSlice": "Assemblage de la section {index} sur {total}...",
+      "service.error.noCaptureToCancel": "Aucune capture en cours à annuler.",
+      "service.error.noRecentProject": "Aucun projet récent n'a été trouvé.",
+      "service.error.viewportSize": "La taille de la fenêtre visible n'a pas pu être identifiée.",
+      "service.error.viewportContent": "La zone utile de la fenêtre visible n'a pas pu être identifiée.",
+      "service.error.pageHeight": "La hauteur de la page n'a pas pu être identifiée.",
+      "service.error.buildFullPage": "La capture pleine page n'a pas pu être construite.",
+      "service.error.prepareFullPageCanvas": "Le canvas de la capture pleine page n'a pas pu être préparé.",
+      "service.error.captureTab": "La capture de l'onglet n'a pas pu être exécutée.",
+      "service.error.tabWindow": "La fenêtre de l'onglet à capturer n'a pas pu être identifiée.",
+      "service.error.visibleCaptureEmpty": "La capture visible est revenue vide.",
+      "service.error.cropCanvas": "Le canvas de recadrage n'a pas pu être préparé.",
+      "service.error.readImage": "L'image capturée n'a pas pu être lue.",
+      "service.error.captureInProgress": "Une capture est déjà en cours sur cet onglet.",
+      "service.error.captureCancelled": "Capture annulée.",
+      "service.error.activeTabNotFound": "L'onglet actif est introuvable.",
+      "service.error.regionNotReceived": "La région sélectionnée n'a pas été reçue.",
+      "service.error.invalidX": "La coordonnée horizontale sélectionnée est invalide.",
+      "service.error.invalidY": "La coordonnée verticale sélectionnée est invalide.",
+      "service.error.invalidWidth": "La largeur sélectionnée est invalide.",
+      "service.error.invalidHeight": "La hauteur sélectionnée est invalide.",
+      "service.error.invalidViewportWidth": "La largeur de la fenêtre visible est invalide.",
+      "service.error.invalidViewportHeight": "La hauteur de la fenêtre visible est invalide.",
+
+      "captureStore.error.save": "La capture n'a pas pu être enregistrée.",
+      "captureStore.error.saveComplete": "L'enregistrement de la capture n'a pas pu être finalisé.",
+      "captureStore.error.saveAbort": "L'enregistrement de la capture a été annulé.",
+      "captureStore.error.read": "La capture n'a pas pu être lue.",
+      "captureStore.error.readComplete": "La lecture de la capture n'a pas pu être finalisée.",
+      "captureStore.error.list": "Les captures n'ont pas pu être listées.",
+      "captureStore.error.listComplete": "La liste des captures n'a pas pu être finalisée.",
+      "captureStore.error.delete": "La capture n'a pas pu être supprimée.",
+      "captureStore.error.deleteComplete": "La suppression de la capture n'a pas pu être finalisée.",
+      "captureStore.error.openDatabase": "La base de données des captures n'a pas pu être ouverte.",
+    },
+  };
+
+  const DEFAULT_LANGUAGE = getBrowserLanguage();
+  let currentLanguage = DEFAULT_LANGUAGE;
+
+  function getDefaultLanguage() {
+    return DEFAULT_LANGUAGE;
+  }
+
+  function getLanguages() {
+    return AVAILABLE_LANGUAGES.slice();
+  }
+
+  function normalizeLanguage(language, fallbackLanguage = DEFAULT_LANGUAGE) {
+    const value = String(language || "").trim();
+
+    if (!value) {
+      return fallbackLanguage;
+    }
+
+    const lower = value.toLowerCase();
+
+    if (lower === "pt" || lower.startsWith("pt-br")) {
+      return "pt-BR";
+    }
+
+    if (lower.startsWith("pt-pt")) {
+      return "pt-PT";
+    }
+
+    if (lower === "en" || lower.startsWith("en-")) {
+      return "en";
+    }
+
+    if (lower === "es" || lower.startsWith("es-")) {
+      return "es";
+    }
+
+    if (lower === "fr" || lower.startsWith("fr-")) {
+      return "fr";
+    }
+
+    return fallbackLanguage;
+  }
+
+  function getBrowserLanguage() {
+    if (scope.chrome && scope.chrome.i18n && typeof scope.chrome.i18n.getUILanguage === "function") {
+      return normalizeLanguage(scope.chrome.i18n.getUILanguage(), FALLBACK_LANGUAGE);
+    }
+
+    if (typeof navigator !== "undefined" && navigator.language) {
+      return normalizeLanguage(navigator.language, FALLBACK_LANGUAGE);
+    }
+
+    return FALLBACK_LANGUAGE;
+  }
+
+  function formatMessage(template, params) {
+    return String(template || "").replace(/\{(\w+)\}/g, (match, key) => {
+      if (params && Object.prototype.hasOwnProperty.call(params, key)) {
+        return String(params[key]);
+      }
+
+      return match;
+    });
+  }
+
+  function translate(key, params, language) {
+    const normalizedLanguage = normalizeLanguage(language || currentLanguage);
+    const defaultMessages = MESSAGES[FALLBACK_LANGUAGE];
+    const languageMessages = MESSAGES[normalizedLanguage] || defaultMessages;
+    const template = languageMessages[key] || defaultMessages[key] || key;
+
+    return formatMessage(template, params);
+  }
+
+  function setCurrentLanguage(language) {
+    currentLanguage = normalizeLanguage(language);
+    return currentLanguage;
+  }
+
+  function getCurrentLanguageSync() {
+    return currentLanguage;
+  }
+
+  async function getCurrentLanguage() {
+    const result = await storageGet(STORAGE_KEY);
+    const nextLanguage = normalizeLanguage(result[STORAGE_KEY]);
+    currentLanguage = nextLanguage;
+    return nextLanguage;
+  }
+
+  async function setLanguage(language) {
+    const nextLanguage = normalizeLanguage(language);
+    await storageSet({
+      [STORAGE_KEY]: nextLanguage,
+    });
+    currentLanguage = nextLanguage;
+    return nextLanguage;
+  }
+
+  function populateLanguageSelect(select, language) {
+    if (!(select instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    const nextLanguage = normalizeLanguage(language || currentLanguage);
+    const optionsHtml = AVAILABLE_LANGUAGES.map((item) => {
+      const selected = item.code === nextLanguage ? " selected" : "";
+      return `<option value="${item.code}"${selected}>${item.label}</option>`;
+    }).join("");
+
+    select.innerHTML = optionsHtml;
+    select.value = nextLanguage;
+  }
+
+  function applyTranslations(root, language) {
+    const target = root && typeof root.querySelectorAll === "function" ? root : document;
+    const nextLanguage = setCurrentLanguage(language || currentLanguage);
+
+    target.querySelectorAll("[data-i18n]").forEach((element) => {
+      element.textContent = translate(element.dataset.i18n, null, nextLanguage);
+    });
+
+    target.querySelectorAll("[data-i18n-html]").forEach((element) => {
+      element.innerHTML = translate(element.dataset.i18nHtml, null, nextLanguage);
+    });
+
+    target.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+      element.setAttribute(
+        "placeholder",
+        translate(element.dataset.i18nPlaceholder, null, nextLanguage)
+      );
+    });
+
+    target.querySelectorAll("[data-i18n-title]").forEach((element) => {
+      element.setAttribute("title", translate(element.dataset.i18nTitle, null, nextLanguage));
+    });
+
+    target.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
+      element.setAttribute(
+        "aria-label",
+        translate(element.dataset.i18nAriaLabel, null, nextLanguage)
+      );
+    });
+
+    if (target === document) {
+      document.documentElement.lang = nextLanguage;
+    }
+  }
+
+  function storageGet(key) {
+    return new Promise((resolve, reject) => {
+      scope.chrome.storage.local.get(key, (result) => {
+        if (scope.chrome.runtime && scope.chrome.runtime.lastError) {
+          reject(scope.chrome.runtime.lastError);
+          return;
+        }
+
+        resolve(result || {});
+      });
+    });
+  }
+
+  function storageSet(value) {
+    return new Promise((resolve, reject) => {
+      scope.chrome.storage.local.set(value, () => {
+        if (scope.chrome.runtime && scope.chrome.runtime.lastError) {
+          reject(scope.chrome.runtime.lastError);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  scope.PrintExtensionI18n = {
+    applyTranslations,
+    getCurrentLanguage,
+    getCurrentLanguageSync,
+    getDefaultLanguage,
+    getLanguages,
+    normalizeLanguage,
+    populateLanguageSelect,
+    setCurrentLanguage,
+    setLanguage,
+    t: translate,
+  };
+})(typeof self !== "undefined" ? self : window);

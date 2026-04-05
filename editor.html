@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="editor.documentTitle">AureShot Editor</title>
+    <link rel="stylesheet" href="editor.css">
+  </head>
+  <body class="extension-editorial-editor">
+    <div class="editor-shell">
+      <header class="editor-toolbar">
+        <div class="editor-commandbar">
+          <div class="commandbar-main">
+            <div class="commandbar-brand">
+              <p class="editor-kicker">AureShot</p>
+
+              <div class="commandbar-title-block">
+                <h1 data-i18n="editor.heading">Editor de marcação</h1>
+                <p id="captureMeta" class="capture-meta"></p>
+              </div>
+            </div>
+
+            <div class="commandbar-primary-actions">
+              <div class="commandbar-action-group">
+                <button id="saveProjectButton" type="button" class="ghost-button" data-i18n="editor.saveDraft">Salvar rascunho</button>
+                <button id="copyButton" type="button" class="ghost-button" data-i18n="editor.copy">Copiar</button>
+              </div>
+
+              <div class="commandbar-action-group commandbar-action-group-emphasis">
+                <button id="downloadButton" type="button" class="primary-button" data-i18n="editor.downloadPng">Baixar PNG</button>
+                <label class="editor-language-control editor-language-control-compact">
+                  <span data-i18n="common.language">Idioma</span>
+                  <select id="editorLanguageSelect" class="editor-language-select" aria-label="Idioma" data-i18n-aria-label="common.language"></select>
+                </label>
+                <button
+                  id="helpButton"
+                  type="button"
+                  class="help-button"
+                  aria-label="Abrir ajuda"
+                  title="Ajuda"
+                  data-i18n-aria-label="editor.helpButtonLabel"
+                  data-i18n-title="editor.helpButtonLabel"
+                >
+                  ?
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="commandbar-subbar">
+            <p id="editorNotice" class="editor-notice" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="editor-ribbon">
+          <section class="ribbon-group ribbon-group-tools">
+            <div
+              class="ribbon-group-body toolbar-group toolbar-group-tools"
+              role="toolbar"
+              aria-label="Ferramentas"
+              data-i18n-aria-label="editor.caption.tools"
+            >
+              <button type="button" class="tool-button" data-tool="move" data-i18n="editor.tool.move">Mover</button>
+              <button type="button" class="tool-button is-active" data-tool="marker" data-i18n="editor.tool.marker">Marcador</button>
+              <button type="button" class="tool-button" data-tool="arrow" data-i18n="editor.tool.arrow">Seta</button>
+              <button type="button" class="tool-button" data-tool="text" data-i18n="editor.tool.text">Texto</button>
+              <button type="button" class="tool-button" data-tool="pin" data-i18n="editor.tool.pin">Pin</button>
+              <button type="button" class="tool-button" data-tool="circle" data-i18n="editor.tool.circle">Círculo</button>
+              <button type="button" class="tool-button" data-tool="rectangle" data-i18n="editor.tool.rectangle">Retângulo</button>
+              <button type="button" class="tool-button" data-tool="blur" data-i18n="editor.tool.blur">Blur</button>
+              <button type="button" class="tool-button" data-tool="redact" data-i18n="editor.tool.redact">Tarja</button>
+              <button type="button" class="tool-button" data-tool="crop" data-i18n="editor.tool.crop">Crop</button>
+            </div>
+            <p class="ribbon-group-caption" data-i18n="editor.caption.tools">Ferramentas</p>
+          </section>
+
+          <section class="ribbon-group ribbon-group-appearance">
+            <div class="ribbon-group-body ribbon-group-body-controls">
+              <label class="toolbar-control">
+                <span data-i18n="editor.control.color">Cor</span>
+                <input id="colorPicker" type="color" value="#f97316">
+              </label>
+
+              <label class="toolbar-control toolbar-control-range">
+                <span data-i18n="editor.control.size">Espessura / tamanho</span>
+                <input id="strokeWidthRange" type="range" min="2" max="48" step="1" value="6">
+                <strong id="strokeWidthValue">6 px</strong>
+              </label>
+            </div>
+            <p class="ribbon-group-caption" data-i18n="editor.caption.appearance">Ajustes</p>
+          </section>
+
+          <section class="ribbon-group ribbon-group-edit">
+            <div class="ribbon-group-body toolbar-group toolbar-group-edit">
+              <button id="undoButton" type="button" class="ghost-button" data-i18n="editor.undo">Desfazer</button>
+              <button id="redoButton" type="button" class="ghost-button" data-i18n="editor.redo">Refazer</button>
+              <button id="deleteActionButton" type="button" class="ghost-button" data-i18n="editor.delete">Excluir</button>
+              <button id="applyCropButton" type="button" class="ghost-button" data-i18n="editor.applyCrop">Aplicar crop</button>
+            </div>
+            <p class="ribbon-group-caption" data-i18n="editor.caption.edit">Edição</p>
+          </section>
+
+          <section class="ribbon-group ribbon-group-view">
+            <div class="ribbon-group-body toolbar-group toolbar-group-view">
+              <button id="fitWidthButton" type="button" class="ghost-button" data-i18n="editor.fitWidth">Ajustar largura</button>
+              <span id="zoomValue" class="zoom-indicator">100%</span>
+            </div>
+            <p class="ribbon-group-caption" data-i18n="editor.caption.view">Visualização</p>
+          </section>
+        </div>
+      </header>
+
+      <main class="editor-workspace">
+        <section id="editorEmptyState" class="editor-empty-state" aria-live="polite">
+          <h2 data-i18n="editor.empty.loadingTitle">Carregando captura...</h2>
+          <p data-i18n="editor.empty.loadingCopy">Assim que a imagem estiver pronta, o editor será exibido aqui.</p>
+        </section>
+
+        <section id="editorCanvasViewport" class="editor-canvas-viewport is-hidden">
+          <div id="editorCanvasRail" class="editor-canvas-rail">
+            <div id="editorCanvasStage" class="editor-canvas-stage">
+              <canvas id="baseCanvas"></canvas>
+              <canvas id="annotationCanvas"></canvas>
+              <div id="shapeSelectionOverlay" class="shape-selection-overlay is-hidden" aria-hidden="true">
+                <span class="shape-selection-handle" data-handle="nw"></span>
+                <span class="shape-selection-handle" data-handle="ne"></span>
+                <span class="shape-selection-handle" data-handle="se"></span>
+                <span class="shape-selection-handle" data-handle="sw"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <div id="helpModal" class="help-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+        <div class="help-modal-backdrop" data-help-close="true"></div>
+        <div class="help-modal-shell">
+          <section class="help-modal-card">
+            <div class="help-modal-header">
+              <div>
+                <p class="help-modal-kicker" data-i18n="editor.help.kicker">Guia rápido</p>
+                <h2 id="helpModalTitle" data-i18n="editor.help.title">Como usar o editor</h2>
+                <p class="help-modal-copy" data-i18n="editor.help.copy">Os controles principais ficam na barra superior e o restante acontece direto sobre o print.</p>
+              </div>
+              <button id="closeHelpButton" type="button" class="help-close-button" aria-label="Fechar ajuda" data-i18n="editor.help.close" data-i18n-aria-label="editor.help.close">Fechar</button>
+            </div>
+
+            <div class="help-modal-content">
+              <section class="help-section">
+                <h3 data-i18n="editor.help.flow.title">Fluxo básico</h3>
+                <p data-i18n="editor.help.flow.step1">1. Capture a tela ou a página inteira.</p>
+                <p data-i18n="editor.help.flow.step2">2. Escolha uma ferramenta na barra superior.</p>
+                <p data-i18n="editor.help.flow.step3">3. Clique e arraste para desenhar, ou clique para criar texto e pin.</p>
+                <p data-i18n="editor.help.flow.step4">4. Selecione um item para mover, redimensionar ou excluir.</p>
+              </section>
+
+              <section class="help-section">
+                <h3 data-i18n="editor.help.tools.title">Ferramentas</h3>
+                <p data-i18n-html="editor.help.tools.marker"><strong>Marcador</strong>: desenha livremente.</p>
+                <p data-i18n-html="editor.help.tools.arrow"><strong>Seta</strong>: destaca direção.</p>
+                <p data-i18n-html="editor.help.tools.text"><strong>Texto</strong>: adiciona comentário editável.</p>
+                <p data-i18n-html="editor.help.tools.pin"><strong>Pin</strong>: cria marcadores numerados.</p>
+                <p data-i18n-html="editor.help.tools.shapes"><strong>Círculo / Retângulo</strong>: destaca áreas.</p>
+                <p data-i18n-html="editor.help.tools.privacy"><strong>Blur / Tarja</strong>: oculta informações sensíveis.</p>
+                <p data-i18n-html="editor.help.tools.crop"><strong>Crop</strong>: recorta a captura depois de pronta.</p>
+                <p data-i18n-html="editor.help.tools.move"><strong>Mover</strong>: navega pela imagem com arraste.</p>
+              </section>
+
+              <section class="help-section">
+                <h3 data-i18n="editor.help.shortcuts.title">Atalhos úteis</h3>
+                <p data-i18n-html="editor.help.shortcuts.zoom"><strong>Shift + scroll</strong>: zoom no print.</p>
+                <p data-i18n-html="editor.help.shortcuts.pan"><strong>Space</strong>: pan temporário.</p>
+                <p data-i18n-html="editor.help.shortcuts.undo"><strong>Ctrl/Cmd + Z</strong>: desfazer.</p>
+                <p data-i18n-html="editor.help.shortcuts.redo"><strong>Ctrl/Cmd + Y</strong> ou <strong>Ctrl/Cmd + Shift + Z</strong>: refazer.</p>
+                <p data-i18n-html="editor.help.shortcuts.delete"><strong>Delete / Backspace</strong>: excluir item selecionado.</p>
+                <p data-i18n-html="editor.help.shortcuts.copy"><strong>Ctrl/Cmd + Shift + C</strong>: copiar imagem.</p>
+                <p data-i18n-html="editor.help.shortcuts.save"><strong>Ctrl/Cmd + S</strong>: salvar rascunho.</p>
+                <p data-i18n-html="editor.help.shortcuts.snap"><strong>Shift</strong> ao desenhar: snap para formas perfeitas e alinhamentos.</p>
+                <p data-i18n-html="editor.help.shortcuts.help"><strong>F1</strong> ou <strong>?</strong>: abrir ajuda.</p>
+              </section>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script src="i18n.js"></script>
+    <script src="capture-store.js"></script>
+    <script src="editor.js"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "appName": {
+    "message": "AureShot"
+  },
+  "appDescription": {
+    "message": "Capture regions or full pages and annotate them in a dedicated editor."
+  },
+  "actionTitle": {
+    "message": "AureShot"
+  }
+}
