@@ -1,4 +1,4 @@
-importScripts("i18n.js", "capture-store.js");
+bootstrapWorkerDependencies();
 
 const captureLocks = new Set();
 const captureSessions = new Map();
@@ -12,6 +12,145 @@ const visibleCaptureIntervalMs =
 let lastVisibleCaptureAt = 0;
 let visibleCaptureQueue = Promise.resolve();
 let currentLanguage = PrintExtensionI18n.getDefaultLanguage();
+
+function bootstrapWorkerDependencies() {
+  const candidateScripts = ["service-i18n.js", "i18n.js"];
+  let lastBootstrapError = null;
+
+  for (const scriptPath of candidateScripts) {
+    try {
+      importScripts(scriptPath);
+      lastBootstrapError = null;
+      break;
+    } catch (error) {
+      lastBootstrapError = error;
+    }
+  }
+
+  if (!globalThis.PrintExtensionI18n) {
+    globalThis.PrintExtensionI18n = createWorkerFallbackI18n();
+
+    if (lastBootstrapError) {
+      console.warn("Worker i18n bootstrap fallback activated.", lastBootstrapError);
+    }
+  }
+
+  importScripts("capture-store.js");
+}
+
+function createWorkerFallbackI18n() {
+  const STORAGE_KEY = "preferredLanguage";
+  const FALLBACK_LANGUAGE = "en";
+  let fallbackLanguage = getWorkerBrowserLanguage();
+
+  function normalizeLanguage(language) {
+    const value = String(language || "").trim().toLowerCase();
+
+    if (!value) {
+      return FALLBACK_LANGUAGE;
+    }
+
+    if (value === "pt" || value.startsWith("pt-br")) {
+      return "pt-BR";
+    }
+
+    if (value.startsWith("pt-pt")) {
+      return "pt-PT";
+    }
+
+    if (value === "es" || value.startsWith("es-")) {
+      return "es";
+    }
+
+    if (value === "fr" || value.startsWith("fr-")) {
+      return "fr";
+    }
+
+    return "en";
+  }
+
+  function formatMessage(template, params) {
+    return String(template || "").replace(/\{(\w+)\}/g, (match, key) => {
+      if (params && Object.prototype.hasOwnProperty.call(params, key)) {
+        return String(params[key]);
+      }
+
+      return match;
+    });
+  }
+
+  function getMessage(key) {
+    return (
+      {
+        "common.errorUnexpectedCapture": "An unexpected error occurred during capture.",
+        "service.error.captureCancelled": "Capture canceled.",
+      }[key] || key
+    );
+  }
+
+  return {
+    getDefaultLanguage() {
+      return fallbackLanguage;
+    },
+    getCurrentLanguageSync() {
+      return fallbackLanguage;
+    },
+    async getCurrentLanguage() {
+      try {
+        const result = await new Promise((resolve, reject) => {
+          if (!chrome?.storage?.local) {
+            resolve({});
+            return;
+          }
+
+          chrome.storage.local.get(STORAGE_KEY, (value) => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+              reject(chrome.runtime.lastError);
+              return;
+            }
+
+            resolve(value || {});
+          });
+        });
+
+        fallbackLanguage = normalizeLanguage(result[STORAGE_KEY] || fallbackLanguage);
+      } catch (error) {
+        fallbackLanguage = normalizeLanguage(fallbackLanguage);
+      }
+
+      return fallbackLanguage;
+    },
+    normalizeLanguage,
+    populateLanguageSelect() {
+      return;
+    },
+    setCurrentLanguage(language) {
+      fallbackLanguage = normalizeLanguage(language || fallbackLanguage);
+      return fallbackLanguage;
+    },
+    async setLanguage(language) {
+      fallbackLanguage = normalizeLanguage(language || fallbackLanguage);
+      return fallbackLanguage;
+    },
+    t(key, params, language) {
+      const nextLanguage = normalizeLanguage(language || fallbackLanguage);
+      fallbackLanguage = nextLanguage;
+      return formatMessage(getMessage(key), params);
+    },
+  };
+}
+
+function getWorkerBrowserLanguage() {
+  if (globalThis.chrome?.i18n && typeof globalThis.chrome.i18n.getUILanguage === "function") {
+    return globalThis.chrome.i18n.getUILanguage();
+  }
+
+  if (typeof navigator !== "undefined" && navigator.language) {
+    return navigator.language;
+  }
+
+  return "en";
+}
 
 async function withLocale(task) {
   currentLanguage = await PrintExtensionI18n.getCurrentLanguage();
@@ -262,78 +401,118 @@ async function captureFullPage(tabId, session) {
       throw new Error(t("service.error.pageHeight"));
     }
 
-    const slices = buildFullPageSlices(
+    const estimatedSlices = buildFullPageSlices(
       pageState.documentHeight,
       pageState.contentViewportHeight
     );
 
-    if (!slices.length) {
+    if (!estimatedSlices.length) {
       throw new Error(t("service.error.buildFullPage"));
     }
 
     await notifyCaptureProgress(session, 10, t("service.progress.capturingSlices"));
 
-    const firstSlice = slices[0];
-    await scrollTabTo(tabId, 0, firstSlice.scrollY);
-    assertCaptureActive(session);
-    const firstCapture = await captureVisibleTabImage(tabId);
-    const scaleX = firstCapture.width / pageState.viewportWidth;
-    const scaleY = firstCapture.height / pageState.viewportHeight;
-    const sourceCaptureWidth = Math.max(
-      1,
-      Math.round(pageState.contentViewportWidth * scaleX)
-    );
-    const sourceCaptureX = Math.max(0, Math.round((pageState.captureX || 0) * scaleX));
-    const sourceCaptureY = Math.max(0, Math.round((pageState.captureY || 0) * scaleY));
-    const stitchedWidth = sourceCaptureWidth;
-    const stitchedHeight = Math.max(1, Math.round(pageState.documentHeight * scaleY));
-    const canvas = new OffscreenCanvas(stitchedWidth, stitchedHeight);
-    const context = canvas.getContext("2d");
+    let scaleX = 0;
+    let scaleY = 0;
+    let stitchedWidth = 0;
+    let stitchedHeight = 0;
+    let canvas = null;
+    let context = null;
+    let nextStartY = 0;
+    let currentDocumentHeight = pageState.documentHeight;
+    let capturedSlices = 0;
 
-    if (!context) {
-      throw new Error(t("service.error.prepareFullPageCanvas"));
-    }
-
-    await drawSliceOnCanvas(context, firstCapture.dataUrl, firstSlice, {
-      scaleX,
-      scaleY,
-      stitchedWidth,
-      stitchedHeight,
-      sourceCaptureX,
-      sourceCaptureY,
-      sourceCaptureWidth,
-    });
-
-    await notifyCaptureProgress(
-      session,
-      getCaptureSliceProgress(1, slices.length),
-      t("service.progress.assemblingSlice", { index: 1, total: slices.length })
-    );
-
-    if (slices.length > 1) {
-      await hideDeferredFixedElements(tabId);
-    }
-
-    for (let index = 1; index < slices.length; index += 1) {
+    while (nextStartY < currentDocumentHeight - 0.5) {
       assertCaptureActive(session);
-      const slice = slices[index];
-      await scrollTabTo(tabId, 0, slice.scrollY);
+
+      const sliceMetrics = await prepareSliceCapture(tabId, 0, nextStartY, {
+        preserveTopFixed: capturedSlices === 0,
+      });
+
+      assertCaptureActive(session);
+      currentDocumentHeight = Math.max(
+        currentDocumentHeight,
+        Math.max(1, sliceMetrics.documentHeight || 0)
+      );
+
+      const sliceStartY =
+        sliceMetrics.scrollY > nextStartY + 2 ? sliceMetrics.scrollY : nextStartY;
+      const cropOffsetY = Math.max(0, sliceStartY - sliceMetrics.scrollY);
+      const visibleSliceHeight = Math.max(0, sliceMetrics.captureHeight - cropOffsetY);
+      const sliceHeight = Math.min(
+        visibleSliceHeight,
+        Math.max(0, currentDocumentHeight - sliceStartY)
+      );
+
+      if (sliceHeight < 1) {
+        throw new Error(t("service.error.buildFullPage"));
+      }
+
       const capture = await captureVisibleTabImage(tabId);
+
+      if (!scaleX || !scaleY) {
+        scaleX = capture.width / sliceMetrics.viewportWidth;
+        scaleY = capture.height / sliceMetrics.viewportHeight;
+      }
+
+      const requiredWidth = Math.max(1, Math.round(sliceMetrics.captureWidth * scaleX));
+      const requiredHeight = Math.max(1, Math.round(currentDocumentHeight * scaleY));
+
+      if (!canvas || !context) {
+        canvas = new OffscreenCanvas(requiredWidth, requiredHeight);
+        context = canvas.getContext("2d");
+
+        if (!context) {
+          throw new Error(t("service.error.prepareFullPageCanvas"));
+        }
+      } else {
+        const resizedCanvasState = ensureCanvasSize(
+          canvas,
+          context,
+          Math.max(stitchedWidth, requiredWidth),
+          Math.max(stitchedHeight, requiredHeight)
+        );
+        canvas = resizedCanvasState.canvas;
+        context = resizedCanvasState.context;
+      }
+
+      stitchedWidth = canvas.width;
+      stitchedHeight = canvas.height;
+
+      const slice = {
+        startY: sliceStartY,
+        cropOffsetY,
+        sliceHeight,
+        captureX: Math.max(0, Math.round(sliceMetrics.captureX * scaleX)),
+        captureY: Math.max(0, Math.round(sliceMetrics.captureY * scaleY)),
+        captureWidth: Math.max(1, Math.round(sliceMetrics.captureWidth * scaleX)),
+      };
+
       await drawSliceOnCanvas(context, capture.dataUrl, slice, {
         scaleX,
         scaleY,
         stitchedWidth,
         stitchedHeight,
-        sourceCaptureX,
-        sourceCaptureY,
-        sourceCaptureWidth,
       });
+
+      capturedSlices += 1;
+      nextStartY = sliceStartY + sliceHeight;
 
       await notifyCaptureProgress(
         session,
-        getCaptureSliceProgress(index + 1, slices.length),
-        t("service.progress.assemblingSlice", { index: index + 1, total: slices.length })
+        getCaptureSliceProgress(
+          capturedSlices,
+          Math.max(estimatedSlices.length, capturedSlices)
+        ),
+        t("service.progress.assemblingSlice", {
+          index: capturedSlices,
+          total: Math.max(estimatedSlices.length, capturedSlices),
+        })
       );
+    }
+
+    if (!canvas) {
+      throw new Error(t("service.error.prepareFullPageCanvas"));
     }
 
     const blob = await canvas.convertToBlob({
@@ -404,9 +583,18 @@ async function prepareFullPageCapture(tabId) {
       const viewportArea = Math.max(1, viewportWidth * viewportHeight);
       const captureStyleId = "print-extension-fullpage-style";
       const previousCaptureStyle = document.getElementById(captureStyleId);
+      const previousSession = window.__printExtensionFullPageState || null;
 
       if (previousCaptureStyle) {
         previousCaptureStyle.remove();
+      }
+
+      if (
+        previousSession &&
+        previousSession.mutationObserver &&
+        typeof previousSession.mutationObserver.disconnect === "function"
+      ) {
+        previousSession.mutationObserver.disconnect();
       }
 
       for (const element of document.querySelectorAll(
@@ -416,6 +604,17 @@ async function prepareFullPageCapture(tabId) {
           element.removeAttribute("data-print-extension-fullpage-hidden");
         }
       }
+
+      for (const element of document.querySelectorAll(
+        "[data-print-extension-fullpage-preserve='true']"
+      )) {
+        if (element instanceof HTMLElement) {
+          element.removeAttribute("data-print-extension-fullpage-preserve");
+        }
+      }
+
+      docEl.removeAttribute("data-print-extension-fullpage-freeze");
+      delete window.__printExtensionFullPageState;
 
       function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -596,20 +795,6 @@ async function prepareFullPageCapture(tabId) {
         return bestTarget;
       }
 
-      function shouldPreserveForFirstSlice(element, rect) {
-        const visibleWidth = Math.max(
-          0,
-          Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0)
-        );
-        const widthCoverage = visibleWidth / Math.max(1, viewportWidth);
-        const isNearTop = rect.top <= Math.max(24, viewportHeight * 0.18);
-        const isVisibleAtTop = rect.bottom > 0;
-        const isWideHeader = widthCoverage >= 0.45;
-        const isReasonableHeight = rect.height <= viewportHeight * 0.32;
-
-        return isNearTop && isVisibleAtTop && isWideHeader && isReasonableHeight;
-      }
-
       const scrollTarget = findPrimaryScrollTarget();
       const captureStyle = document.createElement("style");
       captureStyle.id = captureStyleId;
@@ -619,89 +804,46 @@ async function prepareFullPageCapture(tabId) {
           opacity: 0 !important;
           pointer-events: none !important;
         }
+        [data-print-extension-fullpage-preserve="true"] {
+          visibility: visible !important;
+          opacity: 1 !important;
+        }
         html[data-print-extension-fullpage-capturing="true"],
         html[data-print-extension-fullpage-capturing="true"] *,
         html[data-print-extension-fullpage-capturing="true"] *::before,
         html[data-print-extension-fullpage-capturing="true"] *::after {
-          animation-delay: 0s !important;
-          animation-duration: 0s !important;
+          scroll-behavior: auto !important;
+          scroll-snap-type: none !important;
+          scroll-snap-align: none !important;
+          scroll-snap-stop: normal !important;
+          overflow-anchor: none !important;
+        }
+        html[data-print-extension-fullpage-freeze="true"],
+        html[data-print-extension-fullpage-freeze="true"] *,
+        html[data-print-extension-fullpage-freeze="true"] *::before,
+        html[data-print-extension-fullpage-freeze="true"] *::after {
           animation-play-state: paused !important;
           caret-color: transparent !important;
-          transition-delay: 0s !important;
-          transition-duration: 0s !important;
+          transition-property: none !important;
         }
       `;
       document.documentElement.appendChild(captureStyle);
 
       docEl.setAttribute("data-print-extension-fullpage-capturing", "true");
 
-      const hiddenElements = [];
-      const deferredHiddenElements = [];
-      const protectedElements = new Set([docEl]);
+      const mutationObserver = new MutationObserver(() => {
+        const session = window.__printExtensionFullPageState || null;
 
-      if (body) {
-        protectedElements.add(body);
-      }
-
-      if (scrollTarget.element instanceof HTMLElement) {
-        let current = scrollTarget.element;
-
-        while (current) {
-          protectedElements.add(current);
-
-          const rootNode = current.getRootNode();
-
-          if (rootNode instanceof ShadowRoot) {
-            current = rootNode.host instanceof HTMLElement ? rootNode.host : null;
-          } else {
-            current = current.parentElement;
-          }
+        if (session) {
+          session.lastMutationAt = performance.now();
         }
-      }
+      });
 
-      walkTree(document, (element) => {
-        if (protectedElements.has(element)) {
-          return;
-        }
-
-        if (scrollTarget.element instanceof HTMLElement && element.contains(scrollTarget.element)) {
-          return;
-        }
-
-        if (element.closest("[data-print-extension-fullpage-hidden='true']")) {
-          return;
-        }
-
-        const computedStyle = window.getComputedStyle(element);
-
-        if (
-          computedStyle.position !== "fixed" &&
-          computedStyle.position !== "sticky"
-        ) {
-          return;
-        }
-
-        if (
-          computedStyle.display === "none" ||
-          computedStyle.visibility === "hidden" ||
-          Number.parseFloat(computedStyle.opacity || "1") === 0
-        ) {
-          return;
-        }
-
-        const rect = element.getBoundingClientRect();
-
-        if (rect.width < 1 || rect.height < 1) {
-          return;
-        }
-
-        if (shouldPreserveForFirstSlice(element, rect)) {
-          deferredHiddenElements.push(element);
-          return;
-        }
-
-        element.setAttribute("data-print-extension-fullpage-hidden", "true");
-        hiddenElements.push(element);
+      mutationObserver.observe(docEl, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["class", "style", "src", "srcset", "sizes", "loading", "hidden"],
       });
 
       window.__printExtensionFullPageState = {
@@ -710,8 +852,11 @@ async function prepareFullPageCapture(tabId) {
         documentElementScrollBehavior: docEl.style.scrollBehavior || "",
         bodyScrollBehavior: body ? body.style.scrollBehavior || "" : "",
         scrollTarget,
-        hiddenElements,
-        deferredHiddenElements,
+        hiddenElements: [],
+        preservedElements: [],
+        deferredHiddenElements: [],
+        lastMutationAt: performance.now(),
+        mutationObserver,
       };
 
       docEl.style.scrollBehavior = "auto";
@@ -738,39 +883,566 @@ async function prepareFullPageCapture(tabId) {
   return state;
 }
 
-async function hideDeferredFixedElements(tabId) {
-  await executeInTab(
+function ensureCanvasSize(canvas, context, width, height) {
+  if (canvas.width >= width && canvas.height >= height) {
+    return {
+      canvas,
+      context,
+    };
+  }
+
+  const nextCanvas = new OffscreenCanvas(
+    Math.max(canvas.width, width),
+    Math.max(canvas.height, height)
+  );
+  const nextContext = nextCanvas.getContext("2d");
+
+  if (!nextContext) {
+    throw new Error(t("service.error.prepareFullPageCanvas"));
+  }
+
+  nextContext.drawImage(canvas, 0, 0);
+
+  return {
+    canvas: nextCanvas,
+    context: nextContext,
+  };
+}
+
+async function prepareSliceCapture(tabId, scrollX, scrollY, options) {
+  return executeInTab(
     tabId,
-    () =>
+    ({ scrollX: nextScrollX, scrollY: nextScrollY, preserveTopFixed }) =>
       new Promise((resolve) => {
         const session = window.__printExtensionFullPageState || null;
+        const docEl = document.documentElement;
+        const body = document.body;
+        const target =
+          session &&
+          session.scrollTarget &&
+          session.scrollTarget.type === "element" &&
+          session.scrollTarget.element instanceof HTMLElement
+            ? session.scrollTarget.element
+            : null;
 
-        if (!session || !Array.isArray(session.deferredHiddenElements)) {
-          resolve();
+        function clamp(value, min, max) {
+          return Math.min(max, Math.max(min, value));
+        }
+
+        function walkTree(root, visitor) {
+          const stack = [];
+
+          if (root instanceof Document) {
+            if (root.documentElement) {
+              stack.push(root.documentElement);
+            }
+          } else if (root instanceof ShadowRoot || root instanceof Element) {
+            stack.push(...root.children);
+          }
+
+          while (stack.length) {
+            const current = stack.pop();
+
+            if (!(current instanceof HTMLElement)) {
+              continue;
+            }
+
+            visitor(current);
+
+            if (current.shadowRoot) {
+              stack.push(...current.shadowRoot.children);
+            }
+
+            stack.push(...current.children);
+          }
+        }
+
+        function getDocumentHeight() {
+          if (target) {
+            return Math.max(target.scrollHeight, target.clientHeight);
+          }
+
+          const scrollingElement = document.scrollingElement || docEl;
+          const bodyHeight = body
+            ? Math.max(body.scrollHeight, body.offsetHeight, body.clientHeight)
+            : 0;
+
+          return Math.max(
+            scrollingElement.scrollHeight,
+            scrollingElement.clientHeight,
+            docEl.scrollHeight,
+            docEl.clientHeight,
+            bodyHeight
+          );
+        }
+
+        function getSliceMetrics() {
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+
+          if (target) {
+            const rect = target.getBoundingClientRect();
+            const captureX = clamp(
+              rect.left + target.clientLeft,
+              0,
+              Math.max(0, viewportWidth - 1)
+            );
+            const captureY = clamp(
+              rect.top + target.clientTop,
+              0,
+              Math.max(0, viewportHeight - 1)
+            );
+            const captureWidth = Math.max(
+              1,
+              Math.min(target.clientWidth, viewportWidth - captureX)
+            );
+            const captureHeight = Math.max(
+              1,
+              Math.min(target.clientHeight, viewportHeight - captureY)
+            );
+
+            return {
+              scrollX: target.scrollLeft,
+              scrollY: target.scrollTop,
+              documentHeight: getDocumentHeight(),
+              viewportWidth,
+              viewportHeight,
+              captureX,
+              captureY,
+              captureWidth,
+              captureHeight,
+            };
+          }
+
+          return {
+            scrollX: window.scrollX,
+            scrollY: window.scrollY,
+            documentHeight: getDocumentHeight(),
+            viewportWidth,
+            viewportHeight,
+            captureX: 0,
+            captureY: 0,
+            captureWidth: Math.max(1, docEl.clientWidth || viewportWidth),
+            captureHeight: Math.max(1, docEl.clientHeight || viewportHeight),
+          };
+        }
+
+        function getElementIdentityText(element) {
+          const role = element.getAttribute("role") || "";
+          const ariaLabel = element.getAttribute("aria-label") || "";
+          const dataTestId = element.getAttribute("data-testid") || "";
+          const className =
+            typeof element.className === "string" ? element.className : "";
+
+          return [
+            element.tagName.toLowerCase(),
+            element.id || "",
+            className,
+            role,
+            ariaLabel,
+            dataTestId,
+          ]
+            .join(" ")
+            .toLowerCase();
+        }
+
+        function hasStrongNavigationSemantics(element) {
+          const tagName = element.tagName.toLowerCase();
+          const role = (element.getAttribute("role") || "").toLowerCase();
+
+          return (
+            tagName === "header" ||
+            tagName === "nav" ||
+            ["banner", "navigation", "menubar", "toolbar", "tablist"].includes(role)
+          );
+        }
+
+        function hasWeakNavigationSignal(element) {
+          const identity = getElementIdentityText(element);
+
+          return /\b(header|navbar|nav|navigation|menu|menubar|toolbar|topbar|masthead|site-header|main-menu|mega-menu)\b/i.test(
+            identity
+          );
+        }
+
+        function hasNavigationDescendant(element) {
+          return Boolean(
+            element.querySelector(
+              "header, nav, [role='banner'], [role='navigation'], [role='menubar'], [role='toolbar'], [role='tablist']"
+            )
+          );
+        }
+
+        function countVisibleInteractiveChildren(element) {
+          const interactiveElements = element.querySelectorAll(
+            "a[href], button, [role='button'], [role='link'], [role='menuitem'], [role='tab'], input:not([type='hidden']), select, textarea"
+          );
+          let visibleCount = 0;
+
+          for (const candidate of interactiveElements) {
+            if (!(candidate instanceof HTMLElement)) {
+              continue;
+            }
+
+            const style = window.getComputedStyle(candidate);
+
+            if (
+              style.display === "none" ||
+              style.visibility === "hidden" ||
+              Number.parseFloat(style.opacity || "1") === 0
+            ) {
+              continue;
+            }
+
+            const rect = candidate.getBoundingClientRect();
+
+            if (rect.width < 12 || rect.height < 12) {
+              continue;
+            }
+
+            visibleCount += 1;
+
+            if (visibleCount >= 6) {
+              return visibleCount;
+            }
+          }
+
+          return visibleCount;
+        }
+
+        function shouldPreserveForFirstSlice(element, rect) {
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const visibleWidth = Math.max(
+            0,
+            Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0)
+          );
+          const widthCoverage = visibleWidth / Math.max(1, viewportWidth);
+          const strongSignal =
+            hasStrongNavigationSemantics(element) || hasNavigationDescendant(element);
+          const weakSignal = hasWeakNavigationSignal(element);
+          const interactiveCount = countVisibleInteractiveChildren(element);
+          const isMenuLike = interactiveCount >= 3;
+          const isNearTop = rect.top <= Math.max(40, viewportHeight * 0.16);
+          const isVisibleAtTop = rect.bottom > 0;
+          const isReasonableHeight =
+            rect.height <= viewportHeight * (strongSignal || weakSignal ? 0.78 : 0.36);
+          const semanticCoverage = widthCoverage >= 0.22;
+          const broadCoverage = widthCoverage >= 0.42;
+          const compactHeader =
+            widthCoverage >= 0.1 && rect.height <= viewportHeight * 0.2;
+
+          if (!isNearTop || !isVisibleAtTop || !isReasonableHeight) {
+            return false;
+          }
+
+          if (strongSignal) {
+            return semanticCoverage || (compactHeader && interactiveCount >= 2) || isMenuLike;
+          }
+
+          if (weakSignal) {
+            return (
+              (semanticCoverage &&
+                (interactiveCount >= 2 || rect.height <= viewportHeight * 0.18)) ||
+              (broadCoverage && isMenuLike)
+            );
+          }
+
+          return broadCoverage && isMenuLike;
+        }
+
+        function buildProtectedElements() {
+          const protectedElements = new Set([docEl]);
+
+          if (body) {
+            protectedElements.add(body);
+          }
+
+          if (target) {
+            let current = target;
+
+            while (current) {
+              protectedElements.add(current);
+
+              const rootNode = current.getRootNode();
+
+              if (rootNode instanceof ShadowRoot) {
+                current = rootNode.host instanceof HTMLElement ? rootNode.host : null;
+              } else {
+                current = current.parentElement;
+              }
+            }
+          }
+
+          return protectedElements;
+        }
+
+        function trackHiddenElement(element) {
+          if (!Array.isArray(session.hiddenElements)) {
+            session.hiddenElements = [];
+          }
+
+          if (!session.hiddenElements.includes(element)) {
+            session.hiddenElements.push(element);
+          }
+        }
+
+        function trackPreservedElement(element) {
+          if (!Array.isArray(session.preservedElements)) {
+            session.preservedElements = [];
+          }
+
+          if (!session.preservedElements.includes(element)) {
+            session.preservedElements.push(element);
+          }
+
+          element.removeAttribute("data-print-extension-fullpage-hidden");
+          element.setAttribute("data-print-extension-fullpage-preserve", "true");
+        }
+
+        function hideFloatingElements() {
+          if (!session) {
+            return;
+          }
+
+          if (!Array.isArray(session.deferredHiddenElements)) {
+            session.deferredHiddenElements = [];
+          }
+
+          if (!preserveTopFixed && session.deferredHiddenElements.length) {
+            for (const element of session.deferredHiddenElements) {
+              if (!(element instanceof HTMLElement)) {
+                continue;
+              }
+
+              element.removeAttribute("data-print-extension-fullpage-preserve");
+              element.setAttribute("data-print-extension-fullpage-hidden", "true");
+              trackHiddenElement(element);
+            }
+
+            session.deferredHiddenElements = [];
+          }
+
+          const protectedElements = buildProtectedElements();
+
+          walkTree(document, (element) => {
+            if (protectedElements.has(element)) {
+              return;
+            }
+
+            if (target && element.contains(target)) {
+              return;
+            }
+
+            if (element.closest("[data-print-extension-fullpage-hidden='true']")) {
+              return;
+            }
+
+            if (element.closest("[data-print-extension-fullpage-preserve='true']")) {
+              return;
+            }
+
+            if (
+              Array.isArray(session.hiddenElements) &&
+              session.hiddenElements.includes(element)
+            ) {
+              return;
+            }
+
+            const computedStyle = window.getComputedStyle(element);
+
+            if (
+              computedStyle.position !== "fixed" &&
+              computedStyle.position !== "sticky"
+            ) {
+              return;
+            }
+
+            if (
+              computedStyle.display === "none" ||
+              computedStyle.visibility === "hidden" ||
+              Number.parseFloat(computedStyle.opacity || "1") === 0
+            ) {
+              return;
+            }
+
+            const rect = element.getBoundingClientRect();
+
+            if (rect.width < 1 || rect.height < 1) {
+              return;
+            }
+
+            if (preserveTopFixed && shouldPreserveForFirstSlice(element, rect)) {
+              trackPreservedElement(element);
+
+              if (!session.deferredHiddenElements.includes(element)) {
+                session.deferredHiddenElements.push(element);
+              }
+
+              return;
+            }
+
+            element.removeAttribute("data-print-extension-fullpage-preserve");
+            element.setAttribute("data-print-extension-fullpage-hidden", "true");
+            trackHiddenElement(element);
+          });
+        }
+
+        function isNearViewport(rect) {
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const verticalMargin = Math.max(96, viewportHeight * 0.25);
+          const horizontalMargin = Math.max(64, viewportWidth * 0.15);
+
+          return (
+            rect.bottom >= -verticalMargin &&
+            rect.top <= viewportHeight + verticalMargin &&
+            rect.right >= -horizontalMargin &&
+            rect.left <= viewportWidth + horizontalMargin
+          );
+        }
+
+        function countPendingVisibleMedia() {
+          let pending = 0;
+
+          for (const image of document.images) {
+            if (!(image instanceof HTMLImageElement)) {
+              continue;
+            }
+
+            if (!isNearViewport(image.getBoundingClientRect())) {
+              continue;
+            }
+
+            if (!image.complete) {
+              pending += 1;
+
+              if (pending >= 8) {
+                return pending;
+              }
+            }
+          }
+
+          for (const video of document.querySelectorAll("video")) {
+            if (!(video instanceof HTMLVideoElement)) {
+              continue;
+            }
+
+            if (!isNearViewport(video.getBoundingClientRect())) {
+              continue;
+            }
+
+            if (video.readyState < 2) {
+              pending += 1;
+
+              if (pending >= 8) {
+                return pending;
+              }
+            }
+          }
+
+          return pending;
+        }
+
+        function finalizeSlicePreparation() {
+          hideFloatingElements();
+
+          requestAnimationFrame(() => {
+            docEl.setAttribute("data-print-extension-fullpage-freeze", "true");
+
+            requestAnimationFrame(() => {
+              resolve(getSliceMetrics());
+            });
+          });
+        }
+
+        if (!session) {
+          finalizeSlicePreparation();
           return;
         }
 
-        if (!Array.isArray(session.hiddenElements)) {
-          session.hiddenElements = [];
+        docEl.removeAttribute("data-print-extension-fullpage-freeze");
+
+        if (target) {
+          target.scrollTo({
+            left: nextScrollX,
+            top: nextScrollY,
+            behavior: "auto",
+          });
+        } else {
+          window.scrollTo({
+            left: nextScrollX,
+            top: nextScrollY,
+            behavior: "auto",
+          });
         }
 
-        for (const element of session.deferredHiddenElements) {
-          if (!(element instanceof HTMLElement)) {
-            continue;
+        const startedAt = performance.now();
+        let stableTicks = 0;
+        let lastScrollX = null;
+        let lastScrollY = null;
+
+        function waitForStableViewport() {
+          const metrics = getSliceMetrics();
+          const maxScrollX = target
+            ? Math.max(0, target.scrollWidth - target.clientWidth)
+            : Math.max(
+                0,
+                Math.max(
+                  (document.scrollingElement || docEl).scrollWidth,
+                  docEl.scrollWidth,
+                  body ? body.scrollWidth : 0
+                ) - metrics.captureWidth
+              );
+          const maxScrollY = Math.max(0, metrics.documentHeight - metrics.captureHeight);
+          const expectedScrollX = Math.min(nextScrollX, maxScrollX);
+          const expectedScrollY = Math.min(nextScrollY, maxScrollY);
+          const scrollStable =
+            lastScrollX !== null &&
+            lastScrollY !== null &&
+            Math.abs(metrics.scrollX - lastScrollX) <= 1 &&
+            Math.abs(metrics.scrollY - lastScrollY) <= 1;
+          const targetReached =
+            Math.abs(metrics.scrollX - expectedScrollX) <= 2 &&
+            Math.abs(metrics.scrollY - expectedScrollY) <= 2;
+          const quietEnough =
+            performance.now() - (session.lastMutationAt || 0) >= 220;
+          const fontsReady =
+            !document.fonts || document.fonts.status === "loaded";
+          const pendingVisibleMedia = countPendingVisibleMedia();
+
+          if (scrollStable && targetReached && quietEnough && fontsReady && pendingVisibleMedia === 0) {
+            stableTicks += 1;
+          } else {
+            stableTicks = 0;
           }
 
-          element.setAttribute("data-print-extension-fullpage-hidden", "true");
-          session.hiddenElements.push(element);
+          lastScrollX = metrics.scrollX;
+          lastScrollY = metrics.scrollY;
+
+          if (stableTicks >= 2 || performance.now() - startedAt >= 2800) {
+            finalizeSlicePreparation();
+            return;
+          }
+
+          const nextDelay = pendingVisibleMedia > 0 || !fontsReady ? 90 : 45;
+
+          window.setTimeout(() => {
+            requestAnimationFrame(waitForStableViewport);
+          }, nextDelay);
         }
 
-        session.deferredHiddenElements = [];
-
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            window.setTimeout(resolve, 80);
-          });
+          requestAnimationFrame(waitForStableViewport);
         });
-      })
+      }),
+    [
+      {
+        scrollX,
+        scrollY,
+        preserveTopFixed: Boolean(options && options.preserveTopFixed),
+      },
+    ]
   );
 }
 
@@ -813,6 +1485,37 @@ async function restoreFullPageCapture(tabId, pageState) {
           }
         }
 
+        if (Array.isArray(session.preservedElements)) {
+          for (const element of session.preservedElements) {
+            if (element instanceof HTMLElement) {
+              element.removeAttribute("data-print-extension-fullpage-preserve");
+            }
+          }
+        }
+
+        if (
+          session.mutationObserver &&
+          typeof session.mutationObserver.disconnect === "function"
+        ) {
+          session.mutationObserver.disconnect();
+        }
+
+        for (const element of document.querySelectorAll(
+          "[data-print-extension-fullpage-hidden='true']"
+        )) {
+          if (element instanceof HTMLElement) {
+            element.removeAttribute("data-print-extension-fullpage-hidden");
+          }
+        }
+
+        for (const element of document.querySelectorAll(
+          "[data-print-extension-fullpage-preserve='true']"
+        )) {
+          if (element instanceof HTMLElement) {
+            element.removeAttribute("data-print-extension-fullpage-preserve");
+          }
+        }
+
         const captureStyle = document.getElementById("print-extension-fullpage-style");
 
         if (captureStyle) {
@@ -820,6 +1523,7 @@ async function restoreFullPageCapture(tabId, pageState) {
         }
 
         docEl.removeAttribute("data-print-extension-fullpage-capturing");
+        docEl.removeAttribute("data-print-extension-fullpage-freeze");
         delete window.__printExtensionFullPageState;
       }
 
@@ -868,15 +1572,19 @@ async function drawSliceOnCanvas(context, dataUrl, slice, metrics) {
   const imageBitmap = await createImageBitmap(sourceBlob);
 
   try {
-    const sourceX = Math.max(0, metrics.sourceCaptureX || 0);
+    const sourceX = Math.max(0, slice.captureX || 0);
     const sourceY = Math.max(
       0,
-      (metrics.sourceCaptureY || 0) + Math.round(slice.cropOffsetY * metrics.scaleY)
+      (slice.captureY || 0) + Math.round(slice.cropOffsetY * metrics.scaleY)
     );
     const targetY = Math.max(0, Math.round(slice.startY * metrics.scaleY));
+    const targetWidth = Math.min(
+      metrics.stitchedWidth,
+      Math.max(1, slice.captureWidth || metrics.stitchedWidth)
+    );
     const sourceWidth = Math.min(
       Math.max(1, imageBitmap.width - sourceX),
-      Math.max(1, metrics.sourceCaptureWidth)
+      Math.max(1, slice.captureWidth || metrics.stitchedWidth)
     );
     const targetHeight = Math.min(
       metrics.stitchedHeight - targetY,
@@ -899,49 +1607,12 @@ async function drawSliceOnCanvas(context, dataUrl, slice, metrics) {
       sourceHeight,
       0,
       targetY,
-      metrics.stitchedWidth,
+      targetWidth,
       sourceHeight
     );
   } finally {
     imageBitmap.close();
   }
-}
-
-async function scrollTabTo(tabId, scrollX, scrollY) {
-  await executeInTab(
-    tabId,
-    ({ scrollX: nextScrollX, scrollY: nextScrollY }) =>
-      new Promise((resolve) => {
-        const session = window.__printExtensionFullPageState || null;
-        const target = session && session.scrollTarget;
-
-        if (target && target.type === "element" && target.element instanceof HTMLElement) {
-          target.element.scrollTo({
-            left: nextScrollX,
-            top: nextScrollY,
-            behavior: "auto",
-          });
-        } else {
-          window.scrollTo({
-            left: nextScrollX,
-            top: nextScrollY,
-            behavior: "auto",
-          });
-        }
-
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            window.setTimeout(resolve, 140);
-          });
-        });
-      }),
-    [
-      {
-        scrollX,
-        scrollY,
-      },
-    ]
-  );
 }
 
 async function executeInTab(tabId, func, args) {

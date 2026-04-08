@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="editor.documentTitle">AureShot Editor</title>
     <link rel="stylesheet" href="editor.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   </head>
   <body class="extension-editorial-editor">
     <div class="editor-shell">
       <header class="editor-toolbar">
         <div class="editor-commandbar">
-          <div class="commandbar-main">
+          <div class="commandbar-main commandbar-main-compact">
             <div class="commandbar-brand">
               <p class="editor-kicker">AureShot</p>
 
@@ -22,12 +23,79 @@
 
             <div class="commandbar-primary-actions">
               <div class="commandbar-action-group">
+                <button id="addImageButton" type="button" class="ghost-button" data-i18n="editor.addImage">Adicionar imagem</button>
+
+                <div class="share-menu">
+                  <button
+                    id="shareMenuButton"
+                    type="button"
+                    class="ghost-button"
+                    aria-haspopup="dialog"
+                    aria-expanded="false"
+                    data-i18n="editor.share"
+                  >
+                    Compartilhar
+                  </button>
+
+                  <div
+                    id="shareMenuPanel"
+                    class="share-menu-panel is-hidden"
+                    role="dialog"
+                    aria-label="Compartilhar"
+                    data-i18n-aria-label="editor.share"
+                  >
+                    <div class="share-menu-view" data-share-step="target">
+                      <div class="share-menu-header">
+                        <p class="share-menu-title" data-i18n="editor.share.chooseTarget">Escolha o destino</p>
+                        <p class="share-menu-copy" data-i18n="editor.share.chooseTargetHelp">Selecione o app e depois o formato do arquivo.</p>
+                      </div>
+
+                      <div class="share-menu-options">
+                        <button type="button" class="share-menu-item share-menu-item-target" data-share-target="whatsapp">
+                          <span class="share-menu-item-title" data-i18n="editor.share.whatsapp">WhatsApp Web</span>
+                        </button>
+                        <button type="button" class="share-menu-item share-menu-item-target" data-share-target="telegram">
+                          <span class="share-menu-item-title" data-i18n="editor.share.telegram">Telegram Web</span>
+                        </button>
+                        <button type="button" class="share-menu-item share-menu-item-target" data-share-target="discord">
+                          <span class="share-menu-item-title" data-i18n="editor.share.discord">Discord</span>
+                        </button>
+                        <button type="button" class="share-menu-item share-menu-item-target" data-share-target="slack">
+                          <span class="share-menu-item-title" data-i18n="editor.share.slack">Slack</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="share-menu-view is-hidden" data-share-step="format">
+                      <div class="share-menu-header">
+                        <button id="shareMenuBackButton" type="button" class="share-menu-back" data-i18n="editor.share.back">Voltar</button>
+                        <p class="share-menu-title" data-i18n="editor.share.chooseFormat">Escolha o formato</p>
+                        <p id="shareMenuTargetSummary" class="share-menu-copy"></p>
+                      </div>
+
+                      <div class="share-menu-options">
+                        <button type="button" class="share-menu-item share-menu-item-format" data-share-format="png">
+                          <span class="share-menu-item-title" data-i18n="editor.share.formatPng">PNG</span>
+                          <span class="share-menu-item-copy" data-i18n="editor.share.formatPngHint">Abre o app e copia o arquivo para a área de transferência.</span>
+                        </button>
+                        <button type="button" class="share-menu-item share-menu-item-format" data-share-format="pdf">
+                          <span class="share-menu-item-title" data-i18n="editor.share.formatPdf">PDF</span>
+                          <span class="share-menu-item-copy" data-i18n="editor.share.formatPdfHint">Abre o app e baixa o arquivo para anexar.</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="commandbar-action-group">
                 <button id="saveProjectButton" type="button" class="ghost-button" data-i18n="editor.saveDraft">Salvar rascunho</button>
                 <button id="copyButton" type="button" class="ghost-button" data-i18n="editor.copy">Copiar</button>
               </div>
 
               <div class="commandbar-action-group commandbar-action-group-emphasis">
                 <button id="downloadButton" type="button" class="primary-button" data-i18n="editor.downloadPng">Baixar PNG</button>
+                <button id="downloadPdfButton" type="button" class="ghost-button" data-i18n="editor.downloadPdf">Baixar PDF</button>
                 <label class="editor-language-control editor-language-control-compact">
                   <span data-i18n="common.language">Idioma</span>
                   <select id="editorLanguageSelect" class="editor-language-select" aria-label="Idioma" data-i18n-aria-label="common.language"></select>
@@ -46,71 +114,58 @@
               </div>
             </div>
           </div>
-
-          <div class="commandbar-subbar">
-            <p id="editorNotice" class="editor-notice" aria-live="polite"></p>
-          </div>
         </div>
 
-        <div class="editor-ribbon">
-          <section class="ribbon-group ribbon-group-tools">
+        <p id="editorNotice" class="editor-notice" aria-live="polite"></p>
+      </header>
+
+      <main class="editor-workspace">
+        <aside id="editorToolSidebar" class="editor-tool-sidebar is-hidden">
+          <div class="tool-sidebar-card">
+            <p class="tool-sidebar-caption" data-i18n="editor.caption.tools">Ferramentas</p>
             <div
-              class="ribbon-group-body toolbar-group toolbar-group-tools"
+              class="tool-sidebar-toolbar"
               role="toolbar"
               aria-label="Ferramentas"
               data-i18n-aria-label="editor.caption.tools"
             >
-              <button type="button" class="tool-button" data-tool="move" data-i18n="editor.tool.move">Mover</button>
-              <button type="button" class="tool-button is-active" data-tool="marker" data-i18n="editor.tool.marker">Marcador</button>
-              <button type="button" class="tool-button" data-tool="arrow" data-i18n="editor.tool.arrow">Seta</button>
-              <button type="button" class="tool-button" data-tool="text" data-i18n="editor.tool.text">Texto</button>
-              <button type="button" class="tool-button" data-tool="pin" data-i18n="editor.tool.pin">Pin</button>
-              <button type="button" class="tool-button" data-tool="circle" data-i18n="editor.tool.circle">Círculo</button>
-              <button type="button" class="tool-button" data-tool="rectangle" data-i18n="editor.tool.rectangle">Retângulo</button>
-              <button type="button" class="tool-button" data-tool="blur" data-i18n="editor.tool.blur">Blur</button>
-              <button type="button" class="tool-button" data-tool="redact" data-i18n="editor.tool.redact">Tarja</button>
-              <button type="button" class="tool-button" data-tool="crop" data-i18n="editor.tool.crop">Crop</button>
+              <button type="button" class="tool-button" data-tool="select" title="Selecionar" data-i18n-title="editor.tool.select">
+                <i class="fa-solid fa-arrow-pointer"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="move" title="Mover" data-i18n-title="editor.tool.move">
+                <i class="fa-solid fa-up-down-left-right"></i>
+              </button>
+              <button type="button" class="tool-button is-active" data-tool="marker" title="Marcador" data-i18n-title="editor.tool.marker">
+                <i class="fa-solid fa-highlighter"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="arrow" title="Seta" data-i18n-title="editor.tool.arrow">
+                <i class="fa-solid fa-arrow-right-long"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="text" title="Texto" data-i18n-title="editor.tool.text">
+                <i class="fa-solid fa-font"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="pin" title="Pin" data-i18n-title="editor.tool.pin">
+                <i class="fa-solid fa-thumbtack"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="circle" title="Círculo" data-i18n-title="editor.tool.circle">
+                <i class="fa-solid fa-circle"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="rectangle" title="Retângulo" data-i18n-title="editor.tool.rectangle">
+                <i class="fa-solid fa-square"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="blur" title="Blur" data-i18n-title="editor.tool.blur">
+                <i class="fa-solid fa-droplet"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="redact" title="Tarja" data-i18n-title="editor.tool.redact">
+                <i class="fa-solid fa-eye-slash"></i>
+              </button>
+              <button type="button" class="tool-button" data-tool="crop" title="Crop" data-i18n-title="editor.tool.crop">
+                <i class="fa-solid fa-crop"></i>
+              </button>
             </div>
-            <p class="ribbon-group-caption" data-i18n="editor.caption.tools">Ferramentas</p>
-          </section>
+          </div>
+        </aside>
 
-          <section class="ribbon-group ribbon-group-appearance">
-            <div class="ribbon-group-body ribbon-group-body-controls">
-              <label class="toolbar-control">
-                <span data-i18n="editor.control.color">Cor</span>
-                <input id="colorPicker" type="color" value="#f97316">
-              </label>
-
-              <label class="toolbar-control toolbar-control-range">
-                <span data-i18n="editor.control.size">Espessura / tamanho</span>
-                <input id="strokeWidthRange" type="range" min="2" max="48" step="1" value="6">
-                <strong id="strokeWidthValue">6 px</strong>
-              </label>
-            </div>
-            <p class="ribbon-group-caption" data-i18n="editor.caption.appearance">Ajustes</p>
-          </section>
-
-          <section class="ribbon-group ribbon-group-edit">
-            <div class="ribbon-group-body toolbar-group toolbar-group-edit">
-              <button id="undoButton" type="button" class="ghost-button" data-i18n="editor.undo">Desfazer</button>
-              <button id="redoButton" type="button" class="ghost-button" data-i18n="editor.redo">Refazer</button>
-              <button id="deleteActionButton" type="button" class="ghost-button" data-i18n="editor.delete">Excluir</button>
-              <button id="applyCropButton" type="button" class="ghost-button" data-i18n="editor.applyCrop">Aplicar crop</button>
-            </div>
-            <p class="ribbon-group-caption" data-i18n="editor.caption.edit">Edição</p>
-          </section>
-
-          <section class="ribbon-group ribbon-group-view">
-            <div class="ribbon-group-body toolbar-group toolbar-group-view">
-              <button id="fitWidthButton" type="button" class="ghost-button" data-i18n="editor.fitWidth">Ajustar largura</button>
-              <span id="zoomValue" class="zoom-indicator">100%</span>
-            </div>
-            <p class="ribbon-group-caption" data-i18n="editor.caption.view">Visualização</p>
-          </section>
-        </div>
-      </header>
-
-      <main class="editor-workspace">
         <section id="editorEmptyState" class="editor-empty-state" aria-live="polite">
           <h2 data-i18n="editor.empty.loadingTitle">Carregando captura...</h2>
           <p data-i18n="editor.empty.loadingCopy">Assim que a imagem estiver pronta, o editor será exibido aqui.</p>
@@ -126,11 +181,184 @@
                 <span class="shape-selection-handle" data-handle="ne"></span>
                 <span class="shape-selection-handle" data-handle="se"></span>
                 <span class="shape-selection-handle" data-handle="sw"></span>
+                <span class="shape-selection-handle" data-handle="n"></span>
+                <span class="shape-selection-handle" data-handle="e"></span>
+                <span class="shape-selection-handle" data-handle="s"></span>
+                <span class="shape-selection-handle" data-handle="w"></span>
               </div>
             </div>
           </div>
         </section>
+
+        <aside id="editorInspector" class="editor-inspector is-hidden">
+          <section id="toolContextGroup" class="inspector-card">
+            <div class="inspector-card-header">
+              <div>
+                <p class="inspector-card-kicker" data-i18n="editor.caption.appearance">Ajustes</p>
+                <p id="toolContextBadge" class="ribbon-context-badge is-hidden" aria-live="polite"></p>
+              </div>
+            </div>
+
+            <div class="inspector-stack">
+              <label class="toolbar-control toolbar-control-color" data-control-role="color">
+                <span data-i18n="editor.control.color">Cor</span>
+                <select id="colorTargetSelect" class="toolbar-inline-select is-hidden">
+                  <option value="text" data-i18n="editor.colorTarget.text">Texto</option>
+                  <option value="background" data-i18n="editor.colorTarget.background">Fundo / highlight</option>
+                </select>
+                <div class="toolbar-color-row">
+                  <input id="colorPicker" type="color" value="#f97316">
+                  <input
+                    id="hexColorInput"
+                    type="text"
+                    class="toolbar-hex-input"
+                    value="#F97316"
+                    inputmode="text"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    autocomplete="off"
+                    maxlength="7"
+                  >
+                  <button id="eyedropperButton" type="button" class="toolbar-inline-button" data-i18n="editor.control.eyedropper">Conta-gotas</button>
+                </div>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="size">
+                <span data-i18n="editor.control.size">Espessura / tamanho</span>
+                <input id="strokeWidthRange" type="range" min="2" max="48" step="1" value="6">
+                <strong id="strokeWidthValue">6 px</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="marker-opacity">
+                <span data-i18n="editor.control.markerOpacity">Opacidade do marcador</span>
+                <input id="markerOpacityRange" type="range" min="10" max="100" step="5" value="100">
+                <strong id="markerOpacityValue">100%</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="rotation">
+                <span data-i18n="editor.control.rotation">Rotação</span>
+                <input id="rotationRange" type="range" min="0" max="360" step="1" value="0">
+                <strong id="rotationValue">0°</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="redact-radius">
+                <span data-i18n="editor.control.redactRadius">Raio da tarja</span>
+                <input id="redactBorderRadiusRange" type="range" min="0" max="48" step="1" value="0">
+                <strong id="redactBorderRadiusValue">0 px</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="font" data-text-style-control="true">
+                <span data-i18n="editor.control.fontSize">Fonte</span>
+                <input id="fontSizeRange" type="range" min="12" max="96" step="1" value="22">
+                <strong id="fontSizeValue">22 px</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-select" data-control-role="text-background" data-text-style-control="true">
+                <span data-i18n="editor.control.textBackground">Fundo do texto</span>
+                <select id="textBackgroundModeSelect">
+                  <option value="none" data-i18n="editor.text.background.none">Sem fundo</option>
+                  <option value="highlight" data-i18n="editor.text.background.highlight">Highlight</option>
+                  <option value="box" data-i18n="editor.text.background.box">Background</option>
+                </select>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="text-opacity" data-text-style-control="true">
+                <span data-i18n="editor.control.textOpacity">Opacidade do fundo</span>
+                <input id="textBackgroundOpacityRange" type="range" min="0" max="100" step="1" value="20">
+                <strong id="textBackgroundOpacityValue">20%</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="text-radius" data-text-style-control="true">
+                <span data-i18n="editor.control.textRadius">Raio do fundo</span>
+                <input id="textBorderRadiusRange" type="range" min="0" max="48" step="1" value="14">
+                <strong id="textBorderRadiusValue">14 px</strong>
+              </label>
+
+              <div class="toolbar-control" data-control-role="text-style" data-text-style-control="true">
+                <span data-i18n="editor.control.textStyle">Estilo do texto</span>
+                <div class="toolbar-segmented">
+                  <button id="textBoldButton" type="button" class="toolbar-inline-button toolbar-segment-button" data-text-style="bold" data-i18n="editor.text.style.bold">Negrito</button>
+                  <button id="textItalicButton" type="button" class="toolbar-inline-button toolbar-segment-button" data-text-style="italic" data-i18n="editor.text.style.italic">Itálico</button>
+                  <button id="textUnderlineButton" type="button" class="toolbar-inline-button toolbar-segment-button" data-text-style="underline" data-i18n="editor.text.style.underline">Sublinhado</button>
+                </div>
+              </div>
+
+              <div class="toolbar-control" data-control-role="text-align" data-text-style-control="true">
+                <span data-i18n="editor.control.textAlign">Alinhamento</span>
+                <div class="toolbar-segmented">
+                  <button type="button" class="toolbar-inline-button toolbar-segment-button" data-text-align="left" data-i18n="editor.text.align.left">Esquerda</button>
+                  <button type="button" class="toolbar-inline-button toolbar-segment-button" data-text-align="center" data-i18n="editor.text.align.center">Centro</button>
+                  <button type="button" class="toolbar-inline-button toolbar-segment-button" data-text-align="right" data-i18n="editor.text.align.right">Direita</button>
+                  <button type="button" class="toolbar-inline-button toolbar-segment-button" data-text-align="justify" data-i18n="editor.text.align.justify">Justificar</button>
+                </div>
+              </div>
+
+              <label class="toolbar-control toolbar-control-select" data-control-role="text-list" data-text-style-control="true">
+                <span data-i18n="editor.control.textList">Lista</span>
+                <select id="textListTypeSelect">
+                  <option value="none" data-i18n="editor.text.list.none">Sem lista</option>
+                  <option value="bullet" data-i18n="editor.text.list.bullet">Marcadores</option>
+                  <option value="number" data-i18n="editor.text.list.number">Numerada</option>
+                </select>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="image-radius">
+                <span data-i18n="editor.control.imageRadius">Raio da imagem</span>
+                <input id="imageBorderRadiusRange" type="range" min="0" max="72" step="1" value="24">
+                <strong id="imageBorderRadiusValue">24 px</strong>
+              </label>
+
+              <label class="toolbar-control toolbar-control-range" data-control-role="image-scale">
+                <span data-i18n="editor.control.imageScale">Escala do corte</span>
+                <input id="imageScaleRange" type="range" min="100" max="300" step="1" value="100">
+                <strong id="imageScaleValue">100%</strong>
+              </label>
+
+              <div class="toolbar-control toolbar-control-actions" data-control-role="image-crop-actions">
+                <span data-i18n="editor.control.imageCrop">Corte da imagem</span>
+                <div class="toolbar-inline-group toolbar-inline-group-wrap">
+                  <button id="toggleImageCropButton" type="button" class="toolbar-inline-button" data-i18n="editor.image.crop.edit">Editar corte</button>
+                  <button id="resetImageCropButton" type="button" class="toolbar-inline-button" data-i18n="editor.image.crop.reset">Redefinir imagem</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="inspector-card inspector-card-compact">
+            <div class="inspector-card-header">
+              <div>
+                <p class="inspector-card-kicker" data-i18n="editor.caption.edit">Edição</p>
+              </div>
+            </div>
+
+            <div class="inspector-stack inspector-stack-tight">
+              <div class="toolbar-group toolbar-group-edit toolbar-group-grid">
+                <button id="undoButton" type="button" class="ghost-button" data-i18n="editor.undo">Desfazer</button>
+                <button id="redoButton" type="button" class="ghost-button" data-i18n="editor.redo">Refazer</button>
+                <button id="deleteActionButton" type="button" class="ghost-button" data-i18n="editor.delete">Excluir</button>
+                <button id="applyCropButton" type="button" class="ghost-button" data-i18n="editor.applyCrop">Aplicar crop</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="inspector-card inspector-card-compact">
+            <div class="inspector-card-header">
+              <div>
+                <p class="inspector-card-kicker" data-i18n="editor.caption.view">Visualização</p>
+              </div>
+            </div>
+
+            <div class="inspector-stack inspector-stack-tight">
+              <div class="toolbar-group toolbar-group-view toolbar-group-grid">
+                <button id="fitWidthButton" type="button" class="ghost-button" data-i18n="editor.fitWidth">Ajustar largura</button>
+                <span id="zoomValue" class="zoom-indicator">100%</span>
+              </div>
+            </div>
+          </section>
+        </aside>
       </main>
+
+      <input id="imageUploadInput" class="visually-hidden" type="file" accept="image/*">
 
       <div id="helpModal" class="help-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
         <div class="help-modal-backdrop" data-help-close="true"></div>
@@ -140,7 +368,7 @@
               <div>
                 <p class="help-modal-kicker" data-i18n="editor.help.kicker">Guia rápido</p>
                 <h2 id="helpModalTitle" data-i18n="editor.help.title">Como usar o editor</h2>
-                <p class="help-modal-copy" data-i18n="editor.help.copy">Os controles principais ficam na barra superior e o restante acontece direto sobre o print.</p>
+                <p class="help-modal-copy" data-i18n="editor.help.copy">As ferramentas ficam na barra lateral esquerda, os ajustes na barra superior e o restante acontece direto sobre o print.</p>
               </div>
               <button id="closeHelpButton" type="button" class="help-close-button" aria-label="Fechar ajuda" data-i18n="editor.help.close" data-i18n-aria-label="editor.help.close">Fechar</button>
             </div>
@@ -149,9 +377,16 @@
               <section class="help-section">
                 <h3 data-i18n="editor.help.flow.title">Fluxo básico</h3>
                 <p data-i18n="editor.help.flow.step1">1. Capture a tela ou a página inteira.</p>
-                <p data-i18n="editor.help.flow.step2">2. Escolha uma ferramenta na barra superior.</p>
+                <p data-i18n="editor.help.flow.step2">2. Escolha uma ferramenta na barra lateral esquerda.</p>
                 <p data-i18n="editor.help.flow.step3">3. Clique e arraste para desenhar, ou clique para criar texto e pin.</p>
                 <p data-i18n="editor.help.flow.step4">4. Selecione um item para mover, redimensionar ou excluir.</p>
+              </section>
+
+              <section class="help-section">
+                <h3 data-i18n="editor.help.share.title">Compartilhar</h3>
+                <p data-i18n="editor.help.share.step1">1. Clique em Compartilhar e escolha o app de destino.</p>
+                <p data-i18n="editor.help.share.step2">2. Escolha PNG para copiar o arquivo ou PDF para baixar o anexo.</p>
+                <p data-i18n="editor.help.share.step3">3. No app aberto, selecione o destinatário e cole ou anexe o arquivo.</p>
               </section>
 
               <section class="help-section">

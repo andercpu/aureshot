@@ -68,6 +68,7 @@
     `;
 
     const selectionElement = overlay.querySelector(".pe-selection");
+    const toolbarElement = overlay.querySelector(".pe-toolbar");
     const topMask = overlay.querySelector('[data-mask="top"]');
     const leftMask = overlay.querySelector('[data-mask="left"]');
     const rightMask = overlay.querySelector('[data-mask="right"]');
@@ -272,14 +273,47 @@
       selectionElement.style.top = `${selectionRect.y}px`;
       selectionElement.style.width = `${selectionRect.width}px`;
       selectionElement.style.height = `${selectionRect.height}px`;
-      selectionElement.dataset.toolbarPosition = selectionRect.y < 96 ? "bottom" : "top";
       toolbarLabel.textContent = t("content.selection.size", {
         width: Math.round(selectionRect.width),
         height: Math.round(selectionRect.height),
       });
       captureButton.disabled =
         selectionRect.width < MIN_SELECTION_SIZE || selectionRect.height < MIN_SELECTION_SIZE;
+      positionToolbarWithinViewport();
       updateMasks();
+    }
+
+    function positionToolbarWithinViewport() {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      toolbarElement.style.left = "0px";
+      toolbarElement.style.right = "auto";
+
+      const toolbarWidth = Math.max(toolbarElement.offsetWidth, 1);
+      const toolbarHeight = Math.max(toolbarElement.offsetHeight, 1);
+      const availableAbove = selectionRect.y;
+      const availableBelow = viewportHeight - (selectionRect.y + selectionRect.height);
+      let toolbarPosition = "top";
+
+      if (availableAbove >= toolbarHeight + 16) {
+        toolbarPosition = "top";
+      } else if (availableBelow >= toolbarHeight + 16) {
+        toolbarPosition = "bottom";
+      } else {
+        toolbarPosition = "inside";
+      }
+
+      selectionElement.dataset.toolbarPosition = toolbarPosition;
+
+      const preferredLeft = selectionRect.width >= toolbarWidth
+        ? 0
+        : Math.min(0, selectionRect.width - toolbarWidth);
+      const minLeft = 8 - selectionRect.x;
+      const maxLeft = viewportWidth - 8 - selectionRect.x - toolbarWidth;
+      const clampedLeft = clamp(preferredLeft, minLeft, maxLeft);
+
+      toolbarElement.style.left = `${Math.round(clampedLeft)}px`;
     }
 
     function teardown(isSilent) {

@@ -102,6 +102,8 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: min(calc(100vw - 16px), 680px);
   padding: 10px;
   border: 1px solid rgba(18, 18, 18, 0.1);
   border-radius: 999px;
@@ -117,6 +119,10 @@
 
 #print-extension-overlay .pe-selection[data-toolbar-position="bottom"] .pe-toolbar {
   top: calc(100% + 12px);
+}
+
+#print-extension-overlay .pe-selection[data-toolbar-position="inside"] .pe-toolbar {
+  top: 8px;
 }
 
 #print-extension-overlay .pe-toolbar-label {
